@@ -99,9 +99,3 @@ A few things worth doing as you build:
 - Do assignment 1a: write a project-level `CLAUDE.md` for that app.
 - Treat the PRD as the source of truth for scope. If you or Claude Code want to add something not in it, decide on purpose, not by accident.
 - Keep it local first: no backend, no login, no deployment required to try it.
-
-## Why this is "local first"
-
-- No Vercel, no Fly.io, no environment variables, no signup needed for this workflow itself
-- Whatever app you build can persist data in the browser (`localStorage`), which is good enough to learn the full idea-to-product loop without deployment friction
-- The PRD Builder is the only piece that talks to a network, and only because generating a PRD needs Claude
