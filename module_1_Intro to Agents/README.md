@@ -96,7 +96,7 @@ Claude Code reads `prd.md`, plans the first sprint with you, and starts building
 
 A few things worth doing as you build:
 
-- Write a project-level `CLAUDE.md` for that app (assignment 1a above), covering the tech stack, common commands, coding standards, and constraints, so Claude Code has context every session without you re-explaining it.
+- Do assignment 1a: write a project-level `CLAUDE.md` for that app.
 - Treat the PRD as the source of truth for scope. If you or Claude Code want to add something not in it, decide on purpose, not by accident.
 - Keep it local first: no backend, no login, no deployment required to try it.
 
