@@ -26,24 +26,6 @@ Every module in this repo works the same way: learn the concept, then build it, 
 - **Career acceleration.** Stand out. Build the future.
 - **Demo Day.** Showcase your work.
 
-## Folder structure
-
-```
-modules/
-├── README.md                        this file
-├── images/
-│   └── course-overview.png          the diagram above
-└── module_1_Intro to Agents/        Week 1, complete
-    ├── README.md                      the module's own walkthrough
-    ├── CLAUDE.md                      instructions for Claude Code inside this module
-    ├── .claude/skills/                /prd-generator and /user-story-writer
-    ├── study-material/                lesson, key concepts, exercises, quiz, warm-up
-    ├── reference/                     deep dives: agent levels, Claude Code anatomy, glossary
-    └── prd-generator/                 the PRD Builder tool
-```
-
-Modules 2 through 7 will be added the same way, one folder per week, each with its own README.
-
 ## Getting started
 
 ### Prerequisites
@@ -60,11 +42,9 @@ Modules 2 through 7 will be added the same way, one folder per week, each with i
 ### Clone the repo
 
 ```bash
-git clone <your-repo-url>
-cd modules
+git clone https://github.com/traversaal-ai/agent-engineering-leidos.git
+cd agent-engineering-leidos
 ```
-
-> Replace `<your-repo-url>` with wherever this ends up hosted (GitHub, GitLab, etc.). This folder isn't pushed anywhere yet, once it is, put the real URL here.
 
 ### Start with Module 1
 
