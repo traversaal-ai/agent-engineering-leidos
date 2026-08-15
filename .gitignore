@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# env files, in case any module folder adds one later
+.env
+.env.local
+.env.*.local
+
+# node
+node_modules/
+.next/
+npm-debug.log*
+
+# python
+__pycache__/
+*.pyc

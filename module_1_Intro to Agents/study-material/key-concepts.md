@@ -1,0 +1,21 @@
+# Module 1: Key Concepts (Glossary)
+
+- **LLM (Large Language Model)**: A model trained on massive amounts of text and code to learn language patterns and generate text by predicting what comes next, one token at a time.
+- **Token**: A unit of text the model processes: a word, part of a word, punctuation, or any small unit of text.
+- **Agent**: Software that interacts with its environment, collects data, and uses that data to take self-determined steps toward a goal. Formula: LLM + Tools/Actions + State.
+- **State**: The output from a tool or action, fed back into the LLM so it knows what happened and can decide the next step.
+- **Tool / Action**: An external capability the LLM can invoke: web search, code execution, file access, an API call.
+- **Agent harness**: The deterministic execution and orchestration layer around an LLM that lets it operate as an autonomous, stateful agent rather than a simple text predictor. "The model thinks, the harness does."
+- **Context management**: Deciding what the agent's working memory includes, excludes, and updates: prompts, documents, conversation history, retrieved information.
+- **Agent loop**: The harness handing the LLM what it needs, the LLM choosing an action, the harness executing it, the result being observed, and the outcome feeding back to the LLM. Repeats until a stop condition is met.
+- **Automation agent (Level 1)**: Follows a fixed, predefined workflow with a known, finite execution path. Best for predictable, repetitive tasks.
+- **ReAct agent (Level 2)**: "Reasoning and Acting." Thinks, acts, and observes in a loop, dynamically deciding its next step rather than following a fixed script.
+- **Multi-agent system (Level 3)**: Multiple specialized agents collaborate, delegating tasks to solve a problem no single agent handles well alone.
+- **CLAUDE.md**: Project memory and instructions file. Loaded automatically at the start of every Claude Code session. Lives at the project root.
+- **Skill**: A reusable instruction pack (a `SKILL.md` file plus optional supporting files), auto-invoked by its description or triggered directly with `/skill-name`. "A saved prompt with superpowers."
+- **MCP server (Model Context Protocol)**: The standard bridge connecting Claude to external tools and data (GitHub, Slack, Figma, a database). Flow: Claude asks the MCP server for a tool result, gets it back, and continues.
+- **Subagent**: A delegate with its own 100% isolated context, system prompt, tool access, and model preference. Spawned fresh for one focused job, then discarded.
+- **Hook**: A deterministic automation (a shell command) that runs on an event, before or after a tool executes, with no exceptions. Used when a failure would cause real-world harm and a prompt-level suggestion isn't a strong enough guarantee.
+- **Deterministic hook**: A hook that runs a plain shell script; guarantees an outcome without relying on the LLM's judgment at all.
+- **LLM-based hook**: A hook that uses a model to evaluate a condition, transform text, or delegate a check.
+- **`.claude/` folder**: The configuration folder inside a project holding `commands/`, `agents/`, `skills/`, `settings.json`, and `hooks.json`.
