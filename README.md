@@ -100,3 +100,7 @@ Run by [Traversaal.ai](https://traversaal.ai): Hamza Farooq (Founder), with Jayi
 ## Contributing / extending
 
 Each new week gets its own `module_N_Name/` folder with the same shape: a `README.md`, a `CLAUDE.md`, `study-material/`, and `reference/`, plus whatever tools or code that week's lesson needs. Copy Module 1's structure as the starting template.
+
+## License
+
+All rights reserved. See [`LICENSE`](LICENSE). This repository is provided for participants of the Agent Engineering Bootcamp; no part of it may be copied, distributed, or reused without written permission from Traversaal.ai.
