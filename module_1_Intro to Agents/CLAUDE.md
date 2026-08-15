@@ -41,7 +41,7 @@ Once you generate a PRD, it becomes the source of truth for whatever you build f
 - `/prd-generator` ([`.claude/skills/prd-generator/SKILL.md`](.claude/skills/prd-generator/SKILL.md)) generates a structured PRD from a feature brief
 - `/user-story-writer` ([`.claude/skills/user-story-writer/SKILL.md`](.claude/skills/user-story-writer/SKILL.md)) converts a feature idea into user stories with Given/When/Then criteria
 
-Any new skill goes in `.claude/skills/<name>/SKILL.md`, with an optional matching `.claude/commands/<name>.md` wrapper so it can be typed as `/<name>`.
+Any new skill goes in `.claude/skills/<name>/SKILL.md`. Its `name` field in the frontmatter is what makes it typeable as `/<name>`, no separate commands wrapper needed.
 
 ## Running things
 
