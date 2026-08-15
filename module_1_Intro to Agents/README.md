@@ -95,7 +95,3 @@ A few things worth doing as you build:
 - No Vercel, no Fly.io, no environment variables, no signup needed for this workflow itself
 - Whatever app you build can persist data in the browser (`localStorage`), which is good enough to learn the full idea-to-product loop without deployment friction
 - The PRD Builder is the only piece that talks to a network, and only because generating a PRD needs Claude
-
-## A worked example, for reference only
-
-If you want to see this whole workflow already carried out once, the course materials folder `agent_engineering_bootcamp_leidos/module_1_Intro to Agents/` has a complete example: a generated PRD for an app called **Recapp** (a local-first meeting notes tool with decisions, action items, and owners), and the actual app built from it. That example lives in a different folder from this one; nothing here depends on it, it is just useful to look at if you want to see a finished result before building your own.
