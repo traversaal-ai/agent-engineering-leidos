@@ -48,9 +48,7 @@ Weekly Tuesday sessions, with two breaks built in.
 | Sep 22 | Module 5 |
 | Sep 29 | Module 6 |
 | Oct 6 | Break |
-| Oct 13 | Demo Day |
-
-> Course materials list a couple of slightly different dates for Demo Day in different places. Treat this table as the one to plan around, and confirm the exact date with your course facilitators if it matters for your schedule.
+| TBC | Demo Day |
 
 ## How we'll learn together
 

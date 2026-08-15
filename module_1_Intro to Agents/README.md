@@ -16,6 +16,16 @@ This folder is a template. It does not contain a finished app, it contains the t
 | 5. Run locally | depends on the stack you build | Whatever "run this app" looks like for the app you built, no deployment needed |
 | 6. Inspect, iterate | (no file) | Open the app, try it, then ask the coding agent for changes |
 
+## Assignments
+
+| Assignment | What you'll do |
+|---|---|
+| **1a: Set up your CLAUDE.md** | Write the project-level `CLAUDE.md` for the app you build in this module, covering the tech stack, common commands, coding standards, and constraints, so Claude Code has context every session without you re-explaining it. |
+| **1b: Try your skills** | Run `/prd-generator` and `/user-story-writer` on a real feature idea. Read each `SKILL.md` in [`.claude/skills/`](.claude/skills/) to understand how it works. |
+| **1c (Bonus): Idea to PRD to MVP** | Take a real product idea through the full workflow: generate a PRD with the PRD Builder, save it, then build the MVP with Claude Code. |
+
+**Skills used:** [`/prd-generator`](.claude/skills/prd-generator/SKILL.md), [`/user-story-writer`](.claude/skills/user-story-writer/SKILL.md)
+
 ## 0. Study material
 
 The concepts behind this whole workflow live in [`study-material/`](study-material/), with deeper background in [`reference/`](reference/). No coding examples or notebooks; the teaching is conceptual, and generating your own PRD and app is the hands-on part.
@@ -86,7 +96,7 @@ Claude Code reads `prd.md`, plans the first sprint with you, and starts building
 
 A few things worth doing as you build:
 
-- Write a project-level `CLAUDE.md` for that app (assignment 1a), covering the tech stack, common commands, coding standards, and constraints, so Claude Code has context every session without you re-explaining it.
+- Write a project-level `CLAUDE.md` for that app (assignment 1a above), covering the tech stack, common commands, coding standards, and constraints, so Claude Code has context every session without you re-explaining it.
 - Treat the PRD as the source of truth for scope. If you or Claude Code want to add something not in it, decide on purpose, not by accident.
 - Keep it local first: no backend, no login, no deployment required to try it.
 
