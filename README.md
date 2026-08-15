@@ -33,7 +33,7 @@ Every module in this repo works the same way: learn the concept, then build it, 
 - **What your team presents:** the business problem and target users, your AI system architecture and design decisions, a working prototype with a live walkthrough, and your key learnings, limitations, and next steps.
 - **Use one or more course topics:** AI agents, multi-agent systems, enterprise RAG, orchestration, voice agents, guardrails and evaluations.
 
-## Schedule
+## Schedule (tentative)
 
 Weekly Tuesday sessions, with two breaks built in.
 
