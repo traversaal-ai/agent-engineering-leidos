@@ -43,6 +43,8 @@ python3 server.py
 
 Then open **http://localhost:4321/prd-generator.html** in **Chrome or Edge**.
 
+The **LLM Proxy URL** field at the top of the form controls where the request goes, and the server pre-fills it for you, so you can usually leave it alone. This copy of the tool is the same as the module's copy in [`../prd-generator/`](../prd-generator/). The module [README](../README.md#2-use-the-prd-builder) explains the field and the model in full.
+
 - Paste your API key, then fill in feature name, problem, target users, and constraints
 - Click **Generate PRD**. It streams an 8-section PRD live from Claude
 - **Save PRD to Folder** opens your browser's folder picker. Choose any folder, approve the "Allow this site to edit files?" prompt, and it creates a subfolder named after your app containing `prd.md`, for example `recapp/prd.md`
