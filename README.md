@@ -18,8 +18,8 @@ Every module in this repo works the same way: learn the concept, then build it, 
 
 | Week | Focus | What you'll learn |
 |---|---|---|
-| **1** | Introduction to AI Agents & Agent Harness | Understand agents. Learn the core components of an agent harness. Understand loops, state, memory, and stop conditions. Build ReAct reasoning and tool-use loops. Add memory, tracing, and structured outputs. Ship a debuggable agent harness. |
-| **2** | Skills, claude.md & Agent Operating System | Define reusable skills as agent capabilities. Use claude.md for agent instructions and context. Connect tools and MCPs. Build a mini agent OS. |
+| **1** | Introduction to AI Agents & Agent Harness | Understand agents. Learn the core components of an agent harness. Understand loops, state, memory, and stop conditions. Build ReAct reasoning and tool-use loops. |
+| **2** | Skills, claude.md & Agent Operating System | Define reusable skills as agent capabilities. Use claude.md for agent instructions and context. Connect tools and MCPs. PRD generation and app creation using Claude Code. |
 | **3** | Sub-Agents, Multi-Agent Foundations & Coordination | Use sub-agents for specialized tasks. Coordinate agents with shared state and tools. Design patterns for multi-agent collaboration. |
 | **4** | Enterprise RAG Systems | Build retrieval, reranking, rewriting, and grounding. Let agents choose tools and knowledge sources. Evaluate faithfulness, coverage, and hallucinations. |
 | **5** | Voice Agents & Conversational Interfaces | Build streaming STT to LLM to TTS pipelines. Handle turn-taking, silence, and interruptions. Optimize for low latency and natural dialogue. |
