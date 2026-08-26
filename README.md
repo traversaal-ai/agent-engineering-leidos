@@ -4,7 +4,7 @@ A 7-week, hands-on course on building real AI agents: from a single ReAct loop b
 
 Every module in this repo works the same way: learn the concept, then build it, locally, with Claude Code as your build partner. Run by [Traversaal.ai](https://traversaal.ai), in partnership with Leidos.
 
-![Course Overview](images/course-overview.png)
+![Course Overview](images/course-overview-v2.png)
 
 ## By the end of this bootcamp, you will be able to
 
