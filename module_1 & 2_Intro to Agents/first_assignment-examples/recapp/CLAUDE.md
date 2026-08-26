@@ -13,7 +13,6 @@ This is the Module 1 course exercise: problem statement, PRD, CLAUDE.md, build t
 These live one level up, in the course folder's `.claude/skills/`, so they work from anywhere in the module.
 
 - `/prd-generator` ([`../.claude/skills/prd-generator/SKILL.md`](../.claude/skills/prd-generator/SKILL.md)) generates a structured PRD from a feature brief
-- `/user-story-writer` ([`../.claude/skills/user-story-writer/SKILL.md`](../.claude/skills/user-story-writer/SKILL.md)) converts a feature idea into user stories with Given/When/Then acceptance criteria
 
 ## Who I am / what I'm building
 

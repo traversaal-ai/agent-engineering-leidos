@@ -31,7 +31,6 @@ prd-generator/prd-generator.html  ->  prd-generator/<app-name>/prd.md  ->  <app-
 ## Skills
 
 - `/prd-generator` ([`.claude/skills/prd-generator/SKILL.md`](.claude/skills/prd-generator/SKILL.md)) generates a structured PRD from a feature brief
-- `/user-story-writer` ([`.claude/skills/user-story-writer/SKILL.md`](.claude/skills/user-story-writer/SKILL.md)) converts a feature idea into user stories with Given/When/Then criteria
 
 Any new skill goes in `.claude/skills/<name>/SKILL.md`, with an optional matching `.claude/commands/<name>.md` wrapper so it can be typed as `/<name>`.
 
