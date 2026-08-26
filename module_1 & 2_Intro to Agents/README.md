@@ -1,4 +1,4 @@
-# Module 1: Intro to AI Agents
+# Module 1 & 2: Intro to AI Agents
 
 A hands-on workflow: learn what an agent actually is, generate a PRD for your own idea, save it, then hand it to Claude Code and build a real local app from it.
 
