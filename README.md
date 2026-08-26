@@ -77,14 +77,6 @@ git clone https://github.com/traversaal-ai/agent-engineering-leidos.git
 cd agent-engineering-leidos
 ```
 
-### Start with Module 1
-
-```bash
-cd "module_1_Intro to Agents"
-```
-
-Then open [`module_1_Intro to Agents/README.md`](module_1_Intro%20to%20Agents/README.md) and follow it: read the lesson, generate a PRD for an idea of your own with the PRD Builder, then hand it to Claude Code and build a real local app from it.
-
 ## How each module is meant to be used
 
 1. **Read the study material first.** Every module's `study-material/lesson.md` teaches the concepts before you touch a tool.
