@@ -12,20 +12,19 @@ Every module in this repo works the same way: learn the concept, then build it, 
 - Deploy and optimize open-source LLMs for cost, latency, and scale
 - Engineer advanced Agentic RAG systems using multimodal retrieval, Knowledge Graph RAG, and semantic caching
 - Create real-time voice agents with streaming STT to LLM to TTS pipelines
-- Design coordinated multi-agent systems using orchestration, MCP, and A2A protocols
 - Ship trustworthy AI applications with guardrails, evaluations, safety controls, and production monitoring
 
 ## The 7 weeks
 
 | Week | Focus | What you'll learn |
 |---|---|---|
-| **1** | Build ReAct Agents and Agent Harness: Trace, Think, Act, and Control | Understand agents. Learn the core components of an agent harness. Explore CLAUDE.md, MCP, hooks, tools, and project setup. Understand loops, state, memory, and stop conditions. Trace and debug agent behavior, tool calls, and execution history. Build a simple, observable Claude agent with clear boundaries. |
-| **2** | Subagents, Agent Teams, and Coordination | Decide between subagents or an agent team. Set up a specialist subagent with the right model, tools, and memory. Understand agent teams: task states, peer messaging, quality hooks. Apply the 90/10 rule (most work goes to subagents; know the 10% worth a full team). Know the ecosystem: real proof points and alternatives. |
-| **3** | Build Agentic RAG with Multimodal Retrieval, Graphs & Semantic Cache | Key differences between multimodal RAG approaches and when each fits. Walk through a production-ready RAG system design. Common production RAG challenges and practical solutions. How semantic caching works and why it improves speed. Common semantic cache issues and how to solve them. |
-| **4** | Orchestrate Smarter: Design Multi-Agent Systems That Coordinate, Collaborate, and Deliver | Understand the protocols that let agents communicate and coordinate. Use an Agent Development Kit to build, configure, and manage multi-agent systems. Connect agents using MCP and A2A for interoperability and secure collaboration. Evaluate multi-agent systems for performance, reliability, and real-world impact. |
-| **5** | Build Voice Agents That Feel Natural: Real-Time STT to LLM to TTS | Build low-latency voice pipelines that reduce delays for real-time conversations. Handle barge-in and interruptions so agents feel responsive. Enable tool use and function calling by voice. Ensure voice quality, low latency, and stable performance. |
-| **6** | Ship AI You Can Trust: Guardrails, Safety, and Production Evals That Scale | What evals are and why they matter before pushing agents to production. Evaluation metrics and frameworks to use. Why guardrails matter: preventing unsafe outputs, bad tool calls, data leaks, and production failures. The different types of guardrails, protecting inputs, outputs, tools, permissions, retrieval, and business rules. How to apply guardrails in action, catching failures and blocking risky behavior. |
-| **7** | Learning to Launch: Capstone Demo Day for Real-World AI Systems | Showcase what you built. See [Demo Day](#demo-day) below for the format. |
+| **1** | Introduction to AI Agents & Agent Harness | Understand agents. Learn the core components of an agent harness. Understand loops, state, memory, and stop conditions. Build ReAct reasoning and tool-use loops. Add memory, tracing, and structured outputs. Ship a debuggable agent harness. |
+| **2** | Skills, claude.md & Agent Operating System | Define reusable skills as agent capabilities. Use claude.md for agent instructions and context. Connect tools and MCPs. Build a mini agent OS. |
+| **3** | Sub-Agents, Multi-Agent Foundations & Coordination | Use sub-agents for specialized tasks. Coordinate agents with shared state and tools. Design patterns for multi-agent collaboration. |
+| **4** | Enterprise RAG Systems | Build retrieval, reranking, rewriting, and grounding. Let agents choose tools and knowledge sources. Evaluate faithfulness, coverage, and hallucinations. |
+| **5** | Voice Agents & Conversational Interfaces | Build streaming STT to LLM to TTS pipelines. Handle turn-taking, silence, and interruptions. Optimize for low latency and natural dialogue. |
+| **6** | Guardrails, Evaluations & Reliability | Add safety, compliance, and injection guardrails. Test accuracy, tool use, and failure cases. Monitor regressions with judges and human review. |
+| **7** | Demo Day | Showcase what you built. See [Demo Day](#demo-day) below for the format. |
 
 ## Demo Day
 
