@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p onboard90/src/app onboard90/src/components onboard90/src/lib)",
+      "Bash(cp recapp/tsconfig.json recapp/postcss.config.mjs recapp/eslint.config.mjs recapp/next.config.ts recapp/.gitignore onboard90/)"
+    ]
+  }
+}

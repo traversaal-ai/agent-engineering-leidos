@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PRD Builder</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f4f6f9;
+    color: #1a1a2e;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  .wrap {
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+
+  header {
+    margin-bottom: 20px;
+  }
+
+  header h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  header p {
+    color: #666;
+    font-size: 0.9rem;
+    margin-top: 4px;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(320px, 420px) 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  @media (max-width: 860px) {
+    .columns { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 10px;
+    padding: 20px;
+  }
+
+  #form-card {
+    position: sticky;
+    top: 24px;
+  }
+
+  @media (max-width: 860px) {
+    #form-card { position: static; }
+  }
+
+  .field {
+    margin-bottom: 14px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #444;
+    margin-bottom: 6px;
+  }
+
+  .field input,
+  .field textarea {
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 9px 11px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    resize: vertical;
+  }
+
+  .field textarea {
+    min-height: 70px;
+  }
+
+  .api-key-row {
+    margin-bottom: 16px;
+  }
+
+  .api-key-row .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .api-key-row label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: #444;
+    margin-bottom: 6px;
+  }
+
+  .api-key-row input {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+
+  .key-status {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .key-status.set   { background: #e3f7e8; color: #1b8a3d; }
+  .key-status.unset { background: #f5e3e3; color: #a33; }
+
+  button.primary {
+    background: #d97757;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 18px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+  }
+  button.primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  button.primary:hover:not(:disabled) { background: #c96a4c; }
+
+  button.secondary {
+    background: #fff;
+    color: #444;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  button.secondary:hover:not(:disabled) { background: #f4f4f4; }
+  button.secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .error {
+    background: #fdecea;
+    color: #a33;
+    border: 1px solid #f5c6c0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    margin-bottom: 14px;
+    display: none;
+  }
+
+  #output-card {
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  #outputTitle {
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  #output-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  #saveStatus {
+    font-size: 0.8rem;
+    margin-top: 10px;
+    display: none;
+  }
+  #saveStatus.ok { color: #1b8a3d; }
+  #saveStatus.error { color: #a33; }
+  #saveStatus code {
+    background: #f0f0f0;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  #fileWarning {
+    background: #fff8e6;
+    border: 1px solid #f0dca0;
+    color: #7a5c00;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  #fileWarning code {
+    background: #f6ecc8;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  #empty-state {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #999;
+    font-size: 0.9rem;
+    padding: 40px 20px;
+  }
+
+  #prd-output {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    display: none;
+  }
+  #prd-output h1 { font-size: 1.25rem; margin: 0 0 12px; }
+  #prd-output h2 { font-size: 1.05rem; margin: 20px 0 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+  #prd-output h3 { font-size: 0.95rem; margin: 14px 0 6px; }
+  #prd-output ul, #prd-output ol { margin: 4px 0 8px 20px; }
+  #prd-output table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+  #prd-output th, #prd-output td { border: 1px solid #ddd; padding: 6px 8px; font-size: 0.85rem; text-align: left; }
+  #prd-output code { background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
+
+  .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 1em;
+    background: #d97757;
+    vertical-align: text-bottom;
+    animation: blink 0.9s step-start infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  #build-panel {
+    background: #fdf6f3;
+    border: 1px solid #f0ddd3;
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .build-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 4px 0 20px;
+  }
+  .build-divider::before,
+  .build-divider::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid #f0ddd3;
+  }
+  .build-divider-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #b09080;
+    white-space: nowrap;
+  }
+
+  .success-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .success-icon {
+    width: 28px;
+    height: 28px;
+    background: #d1fae5;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+  .success-text strong {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #065f46;
+  }
+  .success-text span {
+    font-size: 0.78rem;
+    color: #888;
+  }
+
+  #build-panel h4 {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #aaa;
+    margin-bottom: 8px;
+  }
+
+  .prompt-chip {
+    background: #fff;
+    border: 1px solid #e8d8cd;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.83rem;
+    color: #333;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    line-height: 1.4;
+  }
+  .prompt-chip:hover { border-color: #d97757; background: #fff8f5; }
+  .prompt-chip.featured {
+    background: #fdf1ea;
+    border-color: #d97757;
+    font-weight: 600;
+    color: #1a1a2e;
+  }
+  .prompt-chip .copy-hint {
+    font-size: 0.7rem;
+    color: #bbb;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .prompt-chip:hover .copy-hint { color: #d97757; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>PRD Builder</h1>
+  </header>
+
+  <div class="columns">
+    <div class="card" id="form-card">
+      <div class="api-key-row">
+        <label>Anthropic API Key</label>
+        <div class="row">
+          <input type="password" id="apiKey" placeholder="sk-ant-..." />
+          <span class="key-status unset" id="keyStatus">Not set</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>1. Product name</label>
+        <input type="text" id="featureName" placeholder="e.g. Recapp" />
+      </div>
+
+      <div class="field">
+        <label>2. Problem being solved</label>
+        <textarea id="problem" placeholder="What pain are we solving, and for whom? (1-3 sentences)"></textarea>
+      </div>
+
+      <div class="field">
+        <label>3. Target user(s)</label>
+        <input type="text" id="users" placeholder="e.g. individuals and small teams running recurring meetings" />
+      </div>
+
+      <div class="field">
+        <label>4. Known constraints / context</label>
+        <textarea id="constraints" placeholder="Timeline, technical limits, must run locally, no backend, etc."></textarea>
+      </div>
+
+      <div class="error" id="errorBox"></div>
+      <button class="primary" id="generateBtn" onclick="generatePRD()">Generate PRD</button>
+    </div>
+
+    <div class="card" id="output-card">
+      <div id="output-header" style="display: none;">
+        <h2 id="outputTitle"></h2>
+        <div id="output-actions">
+          <button class="secondary" id="downloadBtn" disabled onclick="downloadPRD()">Download as .md</button>
+        </div>
+      </div>
+      <div id="fileWarning" style="display: none;"></div>
+      <div id="empty-state">Your generated PRD will appear here.<br>Fill in the form on the left and click "Generate PRD" to get started.</div>
+      <div id="prd-output"></div>
+
+      <div id="build-section" style="display: none;">
+        <div id="build-panel" style="margin-top: 24px;">
+          <button class="primary" id="saveBtn" onclick="saveToProject()" style="width: 100%;">Save PRD to Folder</button>
+          <div id="saveStatus"></div>
+
+          <div id="nextStepsCard" style="display: none;">
+            <div class="build-divider"><span class="build-divider-label">Start Building</span></div>
+            <div class="success-row">
+              <div class="success-icon">✓</div>
+              <div class="success-text">
+                <strong id="folderSuccessMsg"></strong>
+                <span>Open your terminal in that folder and run: <code>claude</code></span>
+              </div>
+            </div>
+            <h4>Open Claude Code in that folder and paste this prompt</h4>
+            <div class="prompt-chip featured" onclick="copyChip(this)">
+              <span id="chip1"></span>
+              <span class="copy-hint">click to copy</span>
+            </div>
+            <h4 style="margin-top: 14px;">Or try one of these follow-ups</h4>
+            <div class="prompt-chip" onclick="copyChip(this)">
+              <span>What's the riskiest assumption in this PRD and how should we validate it before building?</span>
+              <span class="copy-hint">click to copy</span>
+            </div>
+            <div class="prompt-chip" onclick="copyChip(this)">
+              <span>Break the first sprint into daily tasks for a team of two engineers.</span>
+              <span class="copy-hint">click to copy</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let rawMarkdown = '';
+  let isGenerating = false;
+  let currentFeatureName = '';
+
+  function slugify(name) {
+    return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled';
+  }
+
+  // Only warn when the browser genuinely cannot pick a folder. Chrome and Edge
+  // can, even on a page opened directly as a file.
+  if (!window.showDirectoryPicker) {
+    const warning = document.getElementById('fileWarning');
+    warning.innerHTML =
+      '<strong>Save PRD to Folder</strong> needs Chrome or Edge. This browser cannot show a folder picker. ' +
+      'Open this page in Chrome, or use <strong>Download as .md</strong> instead.';
+    warning.style.display = 'block';
+  }
+
+  const apiKeyInput = document.getElementById('apiKey');
+  const keyStatus = document.getElementById('keyStatus');
+
+  const savedKey = localStorage.getItem('anthropic_api_key');
+  if (savedKey) {
+    apiKeyInput.value = savedKey;
+    setKeyStatus(true);
+  }
+
+  apiKeyInput.addEventListener('input', () => {
+    const val = apiKeyInput.value.trim();
+    if (val) {
+      localStorage.setItem('anthropic_api_key', val);
+      setKeyStatus(true);
+    } else {
+      localStorage.removeItem('anthropic_api_key');
+      setKeyStatus(false);
+    }
+  });
+
+  function setKeyStatus(set) {
+    keyStatus.textContent = set ? 'Set' : 'Not set';
+    keyStatus.className = 'key-status ' + (set ? 'set' : 'unset');
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = msg;
+    box.style.display = 'block';
+  }
+  function hideError() {
+    document.getElementById('errorBox').style.display = 'none';
+  }
+
+  function setGenerating(on) {
+    isGenerating = on;
+    document.getElementById('generateBtn').disabled = on;
+    document.getElementById('generateBtn').textContent = on ? 'Generating...' : 'Generate PRD';
+  }
+
+  async function generatePRD() {
+    if (isGenerating) return;
+
+    const apiKey = apiKeyInput.value.trim();
+    const featureName = document.getElementById('featureName').value.trim();
+    const problem = document.getElementById('problem').value.trim();
+    const users = document.getElementById('users').value.trim();
+    const constraints = document.getElementById('constraints').value.trim();
+
+    hideError();
+    if (!apiKey) return showError('Please enter your Anthropic API key.');
+    if (!featureName) return showError('Please enter a product name.');
+    if (!problem) return showError('Please describe the problem being solved.');
+
+    const prompt = `You are an expert product manager. Generate a complete, well-structured PRD (Product Requirements Document) for the following product.
+
+Product Name: ${featureName}
+Problem Being Solved: ${problem}
+Target User(s): ${users || 'Not specified, infer from the problem'}
+Known Constraints / Context: ${constraints || 'None specified'}
+
+Generate a PRD with these sections in this exact order:
+1. **Problem Statement**: what pain are we solving and for whom? Why does this matter now?
+2. **Goals**: 3-5 measurable outcomes. Format: "Increase [metric] by [amount] within [timeframe]"
+3. **Non-Goals**: what this product explicitly will NOT do. Be specific to prevent scope creep.
+4. **Users & Use Cases**: who uses this and in what context? Include 2-3 concrete scenarios written as short narratives (not bullet points).
+5. **User Stories**: written as "As a [user type], I want to [action] so that [outcome]." Group into: ### Must-have / ### Should-have / ### Nice-to-have
+6. **Acceptance Criteria**: for each Must-have story, write criteria in Given/When/Then format, specific enough for a QA engineer to write a test.
+7. **Risks**: a bulleted list of what could go wrong or what dependencies exist.
+8. **Success Metrics**: leading indicators (early signals) and lagging indicators (final outcomes).
+
+Rules:
+- Write in plain English, avoid technical jargon
+- Never use em dashes (the long dash). Use commas, colons, parentheses, or separate sentences instead.
+- Format the output as clean Markdown, ## for section headers, ### for subsections
+- Start directly with the PRD, with no preamble
+- Begin with: # ${featureName}`;
+
+    setGenerating(true);
+    rawMarkdown = '';
+    currentFeatureName = featureName;
+
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('output-header').style.display = 'flex';
+    document.getElementById('outputTitle').textContent = featureName + ' PRD';
+    const prdDiv = document.getElementById('prd-output');
+    prdDiv.style.display = 'block';
+    prdDiv.innerHTML = '<span class="cursor"></span>';
+    document.getElementById('downloadBtn').disabled = true;
+    document.getElementById('saveBtn').disabled = true;
+    hideSaveStatus();
+    document.getElementById('build-section').style.display = 'none';
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5',
+          max_tokens: 8192,
+          stream: true,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `API error ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+
+          try {
+            const evt = JSON.parse(data);
+            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+              rawMarkdown += evt.delta.text;
+              prdDiv.innerHTML = markdownToHtml(rawMarkdown) + '<span class="cursor"></span>';
+            }
+          } catch (e) { /* ignore partial JSON */ }
+        }
+      }
+
+      prdDiv.innerHTML = markdownToHtml(rawMarkdown);
+      document.getElementById('downloadBtn').disabled = false;
+      document.getElementById('saveBtn').disabled = false;
+      document.getElementById('saveBtn').style.display = 'block';
+      document.getElementById('nextStepsCard').style.display = 'none';
+      document.getElementById('build-section').style.display = 'block';
+    } catch (e) {
+      showError(e.message || 'Something went wrong calling the API.');
+      document.getElementById('empty-state').style.display = 'flex';
+      document.getElementById('output-header').style.display = 'none';
+      prdDiv.style.display = 'none';
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function downloadPRD() {
+    const filename = `${slugify(currentFeatureName)}-prd.md`;
+    const blob = new Blob([rawMarkdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function showNextSteps(successMsg, subtitle, filename) {
+    document.getElementById('folderSuccessMsg').textContent = successMsg;
+    document.querySelector('#nextStepsCard .success-text span').textContent = subtitle;
+    document.getElementById('chip1').textContent =
+      `I have a new project called ${currentFeatureName}. The PRD is in ${filename}. Read it and help me plan what to build in the first sprint.`;
+    document.getElementById('saveBtn').style.display = 'none';
+    const card = document.getElementById('nextStepsCard');
+    card.style.display = 'block';
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function copyChip(el) {
+    const text = el.querySelector('span:first-child').textContent;
+    const hint = el.querySelector('.copy-hint');
+
+    const fallbackCopy = () => {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(textarea);
+      return ok;
+    };
+
+    const showResult = (ok) => {
+      hint.textContent = ok ? '✓ copied' : 'couldn\'t copy, select the text manually';
+      setTimeout(() => { hint.textContent = 'click to copy'; }, 2000);
+    };
+
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(() => showResult(true)).catch(() => showResult(fallbackCopy()));
+    } else {
+      showResult(fallbackCopy());
+    }
+  }
+
+  function showSaveStatus(msg, isError) {
+    const box = document.getElementById('saveStatus');
+    box.innerHTML = msg;
+    box.className = isError ? 'error' : 'ok';
+    box.style.display = 'block';
+  }
+  function hideSaveStatus() {
+    document.getElementById('saveStatus').style.display = 'none';
+  }
+
+  // Why the native folder picker may be unavailable, in plain English.
+  // Returns null when it *is* available. Chrome and Edge support the picker
+  // both on http://localhost and on pages opened directly as a file.
+  function folderPickerBlockedReason() {
+    if (!window.showDirectoryPicker) {
+      return 'This browser cannot show a folder picker. Only Chrome and Edge support it. ' +
+        'Open this page in Chrome to choose a folder, or use <strong>Download as .md</strong> instead.';
+    }
+    if (!window.isSecureContext) {
+      return 'This page is not a secure context, so the browser blocks the folder picker. ' +
+        'Open it as a local file, or via <code>http://localhost</code>, not through an IP address or other host.';
+    }
+    return null;
+  }
+
+  async function saveToProject() {
+    const saveBtn = document.getElementById('saveBtn');
+    const slug = slugify(currentFeatureName);
+
+    // Call the picker FIRST, while the click's user activation is still valid.
+    // Any await before it would consume the activation and the browser would
+    // refuse to open the dialog.
+    const blockedReason = folderPickerBlockedReason();
+
+    if (!blockedReason) {
+      let rootDir;
+      try {
+        rootDir = await window.showDirectoryPicker({ mode: 'readwrite' });
+      } catch (e) {
+        if (e.name === 'AbortError') return; // user closed the dialog, not an error
+        showSaveStatus(`Could not open the folder picker: ${e.message}`, true);
+        return;
+      }
+
+      // The picker often hands back a read-only handle. Write permission has
+      // to be granted explicitly, or creating the folder/file below fails with
+      // "not allowed by the user agent or the platform in the current context".
+      try {
+        if (rootDir.queryPermission) {
+          let perm = await rootDir.queryPermission({ mode: 'readwrite' });
+          if (perm !== 'granted' && rootDir.requestPermission) {
+            perm = await rootDir.requestPermission({ mode: 'readwrite' });
+          }
+          if (perm !== 'granted') {
+            showSaveStatus(
+              'That folder is read-only for this page. Click <strong>Save PRD to Folder</strong> again and choose ' +
+              '"Edit files" / "Allow" when the browser asks for permission.',
+              true
+            );
+            return;
+          }
+        }
+      } catch (e) {
+        showSaveStatus(
+          'The browser needs permission to write to that folder. Click <strong>Save PRD to Folder</strong> again to approve it.',
+          true
+        );
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+      try {
+        const projectDir = await rootDir.getDirectoryHandle(slug, { create: true });
+        const fileHandle = await projectDir.getFileHandle('prd.md', { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(rawMarkdown);
+        await writable.close();
+        hideSaveStatus();
+        showNextSteps(`"${slug}/prd.md" saved.`, 'Open your terminal in that folder and run: claude', 'prd.md');
+      } catch (e) {
+        const notAllowed = e.name === 'NotAllowedError' || /not allowed/i.test(e.message || '');
+        showSaveStatus(
+          `Could not write the file: ${e.message}` +
+          (notAllowed
+            ? '. Browsers refuse to write into protected folders like Desktop, Documents, Downloads, or your home folder. ' +
+              'Try again and pick a normal project folder (for example one you made yourself inside Documents), then choose "Edit files" when asked.'
+            : ''),
+          true
+        );
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save PRD to Folder';
+      }
+      return;
+    }
+
+    // No folder picker available, so fall back to saving into this project
+    // folder through the local server, and say so explicitly.
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    try {
+      const response = await fetch('/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ featureName: currentFeatureName, markdown: rawMarkdown }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || `Save failed (${response.status})`);
+      showSaveStatus(`${blockedReason} Saved into the project folder instead: <code>${result.path}</code>`, false);
+      showNextSteps(
+        `"${result.filename}" saved.`,
+        'Open your terminal in that folder and run: claude',
+        result.filename
+      );
+    } catch (e) {
+      showSaveStatus(`${blockedReason} Saving to the project folder also failed: ${e.message}`, true);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save PRD to Folder';
+    }
+  }
+
+  // ── Minimal markdown -> HTML renderer (headers, bold, lists, tables) ──
+  function markdownToHtml(md) {
+    let html = md
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    html = html.replace(/^### (.*)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.*)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.*)$/gm, '<h1>$1</h1>');
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // tables
+    html = html.replace(/((?:^\|.*\|$\n?)+)/gm, (block) => {
+      const rows = block.trim().split('\n').filter(r => !/^\|[\s-:|]+\|$/.test(r));
+      if (rows.length < 1) return block;
+      const cells = rows.map(r => r.split('|').slice(1, -1).map(c => c.trim()));
+      let out = '<table><thead><tr>' + cells[0].map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+      for (let i = 1; i < cells.length; i++) {
+        out += '<tr>' + cells[i].map(c => `<td>${c}</td>`).join('') + '</tr>';
+      }
+      return out + '</tbody></table>';
+    });
+
+    // lists
+    html = html.replace(/^- (.*)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, (m) => '<ul>' + m + '</ul>');
+
+    // paragraphs
+    html = html
+      .split('\n\n')
+      .map(block => {
+        if (/^<(h1|h2|h3|ul|table)/.test(block.trim())) return block;
+        return block.trim() ? `<p>${block.replace(/\n/g, '<br>')}</p>` : '';
+      })
+      .join('\n');
+
+    return html;
+  }
+</script>
+</body>
+</html>
