@@ -1,4 +1,4 @@
-# Module 1: Intro to Agents
+# Module 1 & 2: Intro to Agents
 
 ## What this module is
 
