@@ -99,9 +99,3 @@ Open Claude Code inside `recapp/`, which already has a `CLAUDE.md` with project 
 - "Add a keyboard-shortcut quick-entry mode for taking notes during a live meeting"
 
 Each maps to a Should-have or Nice-to-have in the PRD, which makes them good practice at going from PRD to prompt to shipped change.
-
-## Why this is "local first"
-
-- No Vercel, no Fly.io, no environment variables, no signup needed to run Recapp
-- Data lives in the browser (`localStorage`), which is good enough to learn the full idea-to-product loop without deployment friction
-- The PRD Builder is the only piece that talks to a network, and only because generating a PRD needs Claude
