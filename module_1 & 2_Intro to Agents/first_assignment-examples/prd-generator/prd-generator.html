@@ -365,9 +365,9 @@
       </div>
 
       <div class="api-key-row">
-        <label>Anthropic API Key</label>
+        <label>API Key or Proxy Token</label>
         <div class="row">
-          <input type="password" id="apiKey" placeholder="sk-ant-..." />
+          <input type="password" id="apiKey" placeholder="sk-ant-... or proxy token" />
           <span class="key-status unset" id="keyStatus">Not set</span>
         </div>
       </div>
@@ -544,7 +544,7 @@
     const constraints = document.getElementById('constraints').value.trim();
 
     hideError();
-    if (!apiKey) return showError('Please enter your Anthropic API key.');
+    if (!apiKey) return showError('Please enter your API key or proxy token.');
     if (!featureName) return showError('Please enter a product name.');
     if (!problem) return showError('Please describe the problem being solved.');
 
