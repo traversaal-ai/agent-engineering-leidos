@@ -1,5 +1,7 @@
 // Sanity-checks that ANTHROPIC_API_KEY (loaded from .env.local) is valid.
 // Never logs the key itself. Run with: npm run test:key
+import { anthropicConfig } from "../src/lib/anthropic.mjs";
+
 const apiKey = process.env.ANTHROPIC_API_KEY;
 
 if (!apiKey) {
@@ -7,7 +9,10 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const response = await fetch("https://api.anthropic.com/v1/messages", {
+const { baseUrl, model } = anthropicConfig();
+console.log(`Checking ${baseUrl} with model ${model}`);
+
+const response = await fetch(`${baseUrl}/v1/messages`, {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
@@ -15,7 +20,7 @@ const response = await fetch("https://api.anthropic.com/v1/messages", {
     "anthropic-version": "2023-06-01",
   },
   body: JSON.stringify({
-    model: "claude-sonnet-5",
+    model,
     max_tokens: 16,
     messages: [{ role: "user", content: "Reply with the single word: ok" }],
   }),

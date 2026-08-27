@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:key": "node --env-file=.env.local scripts/test-anthropic-key.mjs"
+    "test:key": "node --env-file=.env.local scripts/test-anthropic-key.mjs",
+    "test:config": "node scripts/test-anthropic-config.mjs"
   },
   "dependencies": {
     "next": "16.3.1",
