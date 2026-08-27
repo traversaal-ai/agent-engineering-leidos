@@ -68,7 +68,7 @@ Weekly Tuesday sessions, with a break built in.
 - **Chrome or Edge**, needed for the PRD Builder's Save-to-folder feature in Module 1 (Safari and Firefox fall back to a slightly different save path).
 - **An LLM credential.** Either one of these works, and the tools in this repo accept both:
   - An **Anthropic API key** from [console.anthropic.com](https://console.anthropic.com), used with the default endpoint.
-  - An **LLM proxy base URL plus a key issued for that proxy**, if your cohort routes LLM traffic through a gateway such as LiteLLM. Your proxy key is not valid at `api.anthropic.com`, so the endpoint has to change with it. If Claude Code already works through that gateway, the tools read the base URL and the model from your `~/.claude/settings.json` and you configure nothing further. See [`LLM-PROXY-SUPPORT.md`](LLM-PROXY-SUPPORT.md) for the detail.
+  - An **LLM proxy base URL plus a key issued for that proxy**, if your cohort routes LLM traffic through a gateway such as LiteLLM. Your proxy key is not valid at `api.anthropic.com`, so the endpoint has to change with it. If Claude Code already works through that gateway, the tools read the base URL and the model from your `~/.claude/settings.json` and you configure nothing further. See [`LLM-PROXY-SUPPORT.md`](docs/LLM-PROXY-SUPPORT.md) for the detail.
 
   Never commit a key. Keep it in a local `.env` file, or paste it into a tool's own key field where a module offers one. Each module says which.
 - **Any other API credentials** your cohort provides for building and testing AI features. Keep these out of git the same way, never committed.
@@ -95,7 +95,7 @@ Run by [Traversaal.ai](https://traversaal.ai): Hamza Farooq (Founder), with Jayi
 
 Each new week gets its own `module_N_Name/` folder with the same shape: a `README.md`, a `CLAUDE.md`, `study-material/`, and `reference/`, plus whatever tools or code that week's lesson needs. Copy Module 1's structure as the starting template.
 
-Any tool a student runs should read its base URL and model from configuration, not hardcode them, see [`LLM-PROXY-SUPPORT.md`](LLM-PROXY-SUPPORT.md).
+Any tool a student runs should read its base URL and model from configuration, not hardcode them, see [`LLM-PROXY-SUPPORT.md`](docs/LLM-PROXY-SUPPORT.md).
 
 ## License
 
