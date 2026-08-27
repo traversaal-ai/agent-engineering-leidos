@@ -34,7 +34,7 @@ Every module in this repo works the same way: learn the concept, then build it, 
 
 ## Schedule (tentative)
 
-Weekly Tuesday sessions, with two breaks built in.
+Weekly Tuesday sessions, with a break built in.
 
 | Date | Session |
 |---|---|
@@ -46,8 +46,7 @@ Weekly Tuesday sessions, with two breaks built in.
 | Sep 15 | Module 4 |
 | Sep 22 | Module 5 |
 | Sep 29 | Module 6 |
-| Oct 6 | Break |
-| TBC | Demo Day |
+| Oct 6 | Demo Day |
 
 ## How we'll learn together
 
