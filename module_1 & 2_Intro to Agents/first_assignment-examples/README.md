@@ -19,9 +19,9 @@ The app built here is **Recapp**, a local-first tool for capturing meeting decis
 
 ## API keys: never commit them
 
-The PRD Builder needs an Anthropic API key. Two ways to hold one:
+The PRD Builder needs an API key or proxy token. Two ways to hold one:
 
-- **In the browser tool itself:** paste it into the "Anthropic API Key" field. It is saved only to that browser's `localStorage` and is never written to a file.
+- **In the browser tool itself:** paste it into the "API Key or Proxy Token" field. It is saved only to that browser's `localStorage` and is never written to a file.
 - **For Recapp and its scripts:** copy `recapp/.env.example` to `recapp/.env.local` and put your key there. `.env.local` is already covered by `.gitignore`, so it will never be committed. Never paste a real key into a `.md` file, a chat, or any source file.
 
 Check a key works without printing it:

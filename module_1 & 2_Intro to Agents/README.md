@@ -43,9 +43,9 @@ The concepts behind this whole workflow live in [`study-material/`](study-materi
 
 ## 1. API keys: never commit them
 
-The PRD Builder needs an Anthropic API key. Two ways to hold one:
+The PRD Builder needs an API key or proxy token. Two ways to hold one:
 
-- **In the browser tool itself:** paste it into the "Anthropic API Key" field. It is saved only to that browser's `localStorage` and is never written to a file.
+- **In the browser tool itself:** paste it into the "API Key or Proxy Token" field. It is saved only to that browser's `localStorage` and is never written to a file.
 - **In your own app**, once you build one: put it in that app's `.env.local`, and confirm `.gitignore` covers `.env*` before committing anything.
 
 Never paste a real key into a `.md` file, a chat, or any source file. If a key is ever exposed, rotate it in the [Anthropic Console](https://console.anthropic.com/settings/keys).

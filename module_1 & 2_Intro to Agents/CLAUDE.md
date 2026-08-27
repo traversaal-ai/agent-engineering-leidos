@@ -69,7 +69,7 @@ Once you have built an app from a generated PRD, run it the way that project's s
 
 Never put a real key in a `.md` file, a prompt, a chat, or any source file. Two safe ways to hold one:
 
-- Paste it directly into the PRD Builder's "Anthropic API Key" field. It is saved only to that browser's `localStorage`, never written to a file.
+- Paste it directly into the PRD Builder's "API Key or Proxy Token" field. It is saved only to that browser's `localStorage`, never written to a file.
 - If your own app needs a key (for example, to call the Anthropic API from code you build), put it in that app's `.env.local`, and make sure `.gitignore` covers `.env*` before you commit anything.
 
 ## How to study this module
