@@ -67,8 +67,12 @@ Weekly Tuesday sessions, with two breaks built in.
   ```
 - **Node.js** (LTS) and **Python 3**, for running the tools inside each module.
 - **Chrome or Edge**, needed for the PRD Builder's Save-to-folder feature in Module 1 (Safari and Firefox fall back to a slightly different save path).
-- An **Anthropic API key**, from [console.anthropic.com](https://console.anthropic.com). Never commit it. Each module explains exactly where it's safe to put it.
-- **LLM endpoint access and any other API credentials** your specific cohort provides for building and testing AI features. Keep these out of git the same way, in a local `.env` file, never committed.
+- **An LLM credential.** Either one of these works, and the tools in this repo accept both:
+  - An **Anthropic API key** from [console.anthropic.com](https://console.anthropic.com), used with the default endpoint.
+  - An **LLM proxy base URL plus a key issued for that proxy**, if your cohort routes LLM traffic through a gateway such as LiteLLM. Your proxy key is not valid at `api.anthropic.com`, so the endpoint has to change with it. If Claude Code already works through that gateway, the tools read the base URL and the model from your `~/.claude/settings.json` and you configure nothing further. See [`LLM-PROXY-SUPPORT.md`](LLM-PROXY-SUPPORT.md) for the detail.
+
+  Never commit a key. Keep it in a local `.env` file, or paste it into a tool's own key field where a module offers one. Each module says which.
+- **Any other API credentials** your cohort provides for building and testing AI features. Keep these out of git the same way, never committed.
 
 ### Clone the repo
 
