@@ -358,6 +358,13 @@
   <div class="columns">
     <div class="card" id="form-card">
       <div class="api-key-row">
+        <label>LLM Proxy URL</label>
+        <div class="row">
+          <input type="text" id="proxyUrl" placeholder="https://api.anthropic.com" />
+        </div>
+      </div>
+
+      <div class="api-key-row">
         <label>Anthropic API Key</label>
         <div class="row">
           <input type="password" id="apiKey" placeholder="sk-ant-..." />
@@ -454,6 +461,39 @@
     warning.style.display = 'block';
   }
 
+  const DEFAULT_BASE_URL = 'https://api.anthropic.com';
+  const DEFAULT_MODEL = 'claude-sonnet-5';
+  const proxyUrlInput = document.getElementById('proxyUrl');
+  let model = DEFAULT_MODEL;
+
+  proxyUrlInput.value = localStorage.getItem('llm_proxy_url') || DEFAULT_BASE_URL;
+
+  proxyUrlInput.addEventListener('input', () => {
+    const val = proxyUrlInput.value.trim();
+    if (val) {
+      localStorage.setItem('llm_proxy_url', val);
+    } else {
+      localStorage.removeItem('llm_proxy_url');
+    }
+  });
+
+  // The defaults come from ANTHROPIC_BASE_URL and ANTHROPIC_DEFAULT_SONNET_MODEL in
+  // your Claude Code settings. Only server.py can read that file, so ask it. A page
+  // opened as file:// has no server to ask, and keeps the two defaults above. A proxy
+  // URL you typed before always wins over the one the server reports.
+  const configReady = (async () => {
+    try {
+      const cfg = await (await fetch('/config')).json();
+      if (cfg.model) model = cfg.model;
+      if (cfg.baseUrl && !localStorage.getItem('llm_proxy_url')) {
+        proxyUrlInput.value = cfg.baseUrl;
+      }
+    } catch (e) {
+      console.warn('No /config from the local server, so using the built-in defaults:',
+                   DEFAULT_BASE_URL, DEFAULT_MODEL);
+    }
+  })();
+
   const apiKeyInput = document.getElementById('apiKey');
   const keyStatus = document.getElementById('keyStatus');
 
@@ -547,8 +587,16 @@ Rules:
     hideSaveStatus();
     document.getElementById('build-section').style.display = 'none';
 
+    await configReady;
+
+    // The field holds a base URL, but pasting the full endpoint is an easy mistake,
+    // so drop a trailing /v1/messages rather than send it twice.
+    const baseUrl = (proxyUrlInput.value.trim() || DEFAULT_BASE_URL)
+      .replace(/\/+$/, '')
+      .replace(/\/v1\/messages$/, '');
+
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch(baseUrl + '/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -557,7 +605,7 @@ Rules:
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-5',
+          model: model,
           max_tokens: 8192,
           stream: true,
           messages: [{ role: 'user', content: prompt }],

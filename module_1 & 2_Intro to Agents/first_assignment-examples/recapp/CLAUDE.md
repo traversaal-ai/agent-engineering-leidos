@@ -24,7 +24,8 @@ These live one level up, in the course folder's `.claude/skills/`, so they work 
 
 - Next.js (App Router) with TypeScript and Tailwind CSS
 - No database. Almost all data is persisted in the browser via `localStorage`
-- One backend exception: `src/app/api/extract-actions/route.ts` calls the Anthropic API server-side to turn a pasted or uploaded meeting transcript into a suggested title, series, decisions, and action items. This needs `ANTHROPIC_API_KEY` in `.env.local` to work. It is the only network call the app makes; the transcript text is sent to Anthropic for that one request and is never stored server-side.
+- One backend exception: `src/app/api/extract-actions/route.ts` calls the Anthropic API server-side to turn a pasted or uploaded meeting transcript into a suggested title, series, decisions, and action items. This needs `ANTHROPIC_API_KEY` in `.env.local` to work. It is the only network call the app makes; the transcript text is sent for that one request and is never stored server-side.
+- `src/lib/anthropic.mjs` decides which endpoint and model that route calls, from `ANTHROPIC_BASE_URL` and `ANTHROPIC_DEFAULT_SONNET_MODEL`. Both fall back to `https://api.anthropic.com` and `claude-sonnet-5`, so the app works with no extra settings. Set them in `.env.local` to reach an LLM proxy instead. See `.env.example` for the three names. The file is `.mjs` rather than `.ts` because `scripts/` imports it and `node` runs those scripts with no build step. Run `npm run test:config` to check the resolver, and `npm run test:key` to make one real call.
 
 ## Data model, and why it is shaped this way
 

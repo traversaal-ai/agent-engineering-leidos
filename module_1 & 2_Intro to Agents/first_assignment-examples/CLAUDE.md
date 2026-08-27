@@ -12,7 +12,7 @@ This pattern is meant to be reused for more than one app. Not every app that get
 .claude/skills/            the skills, available anywhere in this module
 prd-generator/              the PRD Builder tool, and the PRDs it generated
   prd-generator.html          the tool, open in Chrome
-  server.py                   local server, needed for Save PRD to Folder
+  server.py                   local server, needed for Save PRD to Folder and for the default proxy URL
   <app-name>/prd.md            one PRD per app
 <app-name>/                 an app, built from its PRD, with its own CLAUDE.md for app-level detail
 ```
@@ -45,6 +45,8 @@ cd prd-generator && python3 server.py   # http://localhost:4321/prd-generator.ht
 ```
 
 The PRD Builder needs Chrome or Edge for its folder picker. Safari and Firefox do not support it and fall back to saving into `prd-generator/`.
+
+The **LLM Proxy URL** field decides which endpoint the page calls. This copy of the tool matches the module's copy in [`../prd-generator/`](../prd-generator/). The module [`CLAUDE.md`](../CLAUDE.md) documents the field, the `GET /config` route, and the two settings the server reads.
 
 ## API keys
 

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { anthropicConfig } from "@/lib/anthropic.mjs";
 
 /**
  * Turns a pasted/uploaded transcript into candidate entries (decisions and
  * action items with an owner) using Claude. The transcript itself is only
- * ever sent to Anthropic for this one extraction call; it is never persisted
+ * ever sent out for this one extraction call; it is never persisted
  * server-side. The API key stays in this route and is never sent to the
- * browser.
+ * browser. ANTHROPIC_BASE_URL decides where the call goes, so the transcript
+ * reaches your own LLM proxy instead of api.anthropic.com when you set it.
  */
 
 const MAX_TRANSCRIPT_CHARS = 60_000;
@@ -82,7 +84,9 @@ export async function POST(req: NextRequest) {
     ? existingSeries.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
     : [];
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const { baseUrl, model } = anthropicConfig();
+
+  const response = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -90,7 +94,7 @@ export async function POST(req: NextRequest) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-5",
+      model,
       max_tokens: 4096,
       system:
         "You extract a title, a meeting series name, decisions, and action items from raw meeting transcripts. " +

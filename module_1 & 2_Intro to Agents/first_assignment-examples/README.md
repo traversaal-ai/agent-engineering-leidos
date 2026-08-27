@@ -22,13 +22,15 @@ The app built here is **Recapp**, a local-first tool for capturing meeting decis
 The PRD Builder needs an Anthropic API key. Two ways to hold one:
 
 - **In the browser tool itself:** paste it into the "Anthropic API Key" field. It is saved only to that browser's `localStorage` and is never written to a file.
-- **For local scripts** (e.g. `recapp/scripts/test-anthropic-key.mjs`): copy `recapp/.env.example` to `recapp/.env.local` and put your key there. `.env.local` is already covered by `.gitignore`, so it will never be committed. Never paste a real key into a `.md` file, a chat, or any source file.
+- **For Recapp and its scripts:** copy `recapp/.env.example` to `recapp/.env.local` and put your key there. `.env.local` is already covered by `.gitignore`, so it will never be committed. Never paste a real key into a `.md` file, a chat, or any source file.
 
 Check a key works without printing it:
 
 ```bash
 cd recapp && npm run test:key
 ```
+
+That command prints the endpoint and the model it used, then makes one small real call.
 
 If a key is ever exposed, rotate it in the [Anthropic Console](https://console.anthropic.com/settings/keys).
 
@@ -42,6 +44,8 @@ python3 server.py
 ```
 
 Then open **http://localhost:4321/prd-generator.html** in **Chrome or Edge**.
+
+The **LLM Proxy URL** field at the top of the form controls where the request goes, and the server pre-fills it for you, so you can usually leave it alone. This copy of the tool is the same as the module's copy in [`../prd-generator/`](../prd-generator/). The module [README](../README.md#2-use-the-prd-builder) explains the field and the model in full.
 
 - Paste your API key, then fill in feature name, problem, target users, and constraints
 - Click **Generate PRD**. It streams an 8-section PRD live from Claude
@@ -85,6 +89,25 @@ npm run dev
 Then open **http://localhost:3000**.
 
 There is nothing to deploy for this exercise. Running it locally satisfies the "local first" requirement in the PRD.
+
+### Pointing Recapp at an LLM proxy
+
+The transcript extraction is the app's one network call. It goes to `https://api.anthropic.com` by default. Two optional names in `recapp/.env.local` redirect it:
+
+| Name | Sets | Fallback |
+|--|--|--|
+| `ANTHROPIC_BASE_URL` | the endpoint, without `/v1/messages` | `https://api.anthropic.com` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | the `model` in the request body | `claude-sonnet-5` |
+
+These are the same two names the PRD Builder reads, so copy the values from your `~/.claude/settings.json` if Claude Code already talks to a proxy. Restart `npm run dev` after you change the file, because Next reads it at startup. A value already exported in your shell wins over the file.
+
+A trailing bracket suffix comes off the model name, so `your-model-name[1m]` is sent as `your-model-name`. Claude Code understands the bracketed form, but a proxy usually rejects it with a `400 Invalid model name passed in`.
+
+Check what the app will use, with no key and no network call:
+
+```bash
+cd recapp && npm run test:config
+```
 
 ### How the data is shaped, and why
 

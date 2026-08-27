@@ -22,7 +22,7 @@ reference/              deep dives the study material points to
   glossary.md              the fuller source-of-truth term list
 prd-generator/          the PRD Builder tool
   prd-generator.html      the tool, open in Chrome or Edge
-  server.py               local server, needed for Save PRD to Folder
+  server.py               local server, needed for Save PRD to Folder and for the default proxy URL
 ```
 
 There are no coding examples or notebooks in this module by design. The teaching is conceptual, and the hands-on part is the workflow itself: generate a real PRD for a real idea of yours, then build it.
@@ -51,6 +51,17 @@ cd prd-generator && python3 server.py   # http://localhost:4321/prd-generator.ht
 ```
 
 The PRD Builder needs Chrome or Edge for its folder picker. Safari and Firefox do not support it and fall back to saving into `prd-generator/`.
+
+The **LLM Proxy URL** field decides which endpoint the page calls. The server serves the defaults at `GET /config`, reading `~/.claude/settings.json`:
+
+| Setting | Used for | Fallback |
+|--|--|--|
+| `ANTHROPIC_BASE_URL` | the LLM Proxy URL field | `https://api.anthropic.com` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | the `model` in the request body | `claude-sonnet-5` |
+
+A trailing bracket suffix comes off the model name, so `your-model-name[1m]` is sent as `your-model-name`. Claude Code accepts the bracketed alias, but a LiteLLM proxy rejects it on `/v1/messages` with a 400 that reads `Invalid model name passed in`. The bracket is a Claude Code routing hint, not part of the name the endpoint knows. See `strip_alias_suffix` in `server.py`.
+
+The page appends `/v1/messages` to whatever base URL it ends up with, so the field holds a base URL only. A proxy URL you type is saved in `localStorage` and wins over the default. The model has no field and is not stored. A page opened as a `file://` URL cannot reach `/config`, so it uses both fallbacks.
 
 Once you have built an app from a generated PRD, run it the way that project's stack normally runs (for example `npm run dev` for a Next.js app). That command lives in whichever app folder you create, not in this module folder.
 

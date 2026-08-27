@@ -61,6 +61,14 @@ python3 server.py
 
 Then open **http://localhost:4321/prd-generator.html** in **Chrome or Edge**.
 
+The **LLM Proxy URL** field at the top of the form controls where the request goes. It is pre-filled for you, so you can usually leave it alone. If your `~/.claude/settings.json` sets `ANTHROPIC_BASE_URL`, the field is pre-filled with that value, so the tool talks to the same proxy your Claude Code already uses. Otherwise it is pre-filled with `https://api.anthropic.com`. Either way the page appends `/v1/messages` itself, so enter only the base URL. If you paste the full endpoint by mistake, the page drops the trailing `/v1/messages` instead of sending it twice. Anything you type is remembered in that browser's `localStorage` and takes priority over the pre-filled default. Clear the field to go back to the default.
+
+The model is picked up the same way, from `ANTHROPIC_DEFAULT_SONNET_MODEL` in the same file, falling back to `claude-sonnet-5`. It has no field in the form, because a proxy that needs a custom base URL may set its own model names too, and reading both from one place keeps them in step. When you start the server it prints both values, so you can confirm what it will use.
+
+If your model name ends in a bracketed suffix, such as `your-model-name[1m]`, the server drops that suffix before the page uses it. Claude Code understands the bracketed form, but a proxy usually rejects it with a `400 Invalid model name passed in`. If you still get that error, the base name is wrong for your key. Ask your proxy administrator which model names your key can use.
+
+Only the local server can read your settings file, so a page opened directly as a `file://` URL always falls back to `https://api.anthropic.com` and `claude-sonnet-5`.
+
 - Paste your API key, then fill in feature name, problem, target users, and constraints
 - Click **Generate PRD**. It streams an 8-section PRD live from Claude
 - **Save PRD to Folder** opens your browser's folder picker. Navigate to and select this module's `prd-generator/` folder, approve the "Allow this site to edit files?" prompt, and it creates a new subfolder inside `prd-generator/`, named after your app, containing `prd.md`
