@@ -46,7 +46,7 @@ Weekly Tuesday sessions, with a break built in.
 | Sep 15 | Break |
 | Sep 22 | Module 5 |
 | Sep 29 | Module 6 |
-| TBC | Demo Day |
+| Oct 6 | Demo Day |
 
 ## How we'll learn together
 
