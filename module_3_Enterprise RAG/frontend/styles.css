@@ -1738,6 +1738,97 @@ button.citation-badge:hover {
   color: var(--muted);
 }
 
+.vd-figure {
+  margin: 0 0 12px;
+  padding: 10px 12px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  overflow-x: auto;
+}
+
+.vd-figure svg {
+  display: block;
+  min-width: 520px;
+}
+
+.vd-cell {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.vd-zero {
+  fill: var(--surface);
+}
+
+.vd-on {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.vd-on-q {
+  fill: var(--warn);
+  stroke: var(--warn);
+}
+
+.vd-label {
+  font-family: "Inter", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--text);
+}
+
+.vd-term {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: var(--accent);
+  text-anchor: middle;
+}
+
+.vd-weight {
+  font-family: var(--mono);
+  font-size: 9px;
+  fill: var(--muted-2);
+  text-anchor: middle;
+}
+
+.vd-caption {
+  font-family: "Inter", sans-serif;
+  font-size: 10px;
+  fill: var(--muted-2);
+}
+
+.vd-link {
+  stroke: var(--muted-2);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.rv-details {
+  margin-top: 4px;
+}
+
+.rv-details summary {
+  font-size: 11.5px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 3px 0;
+  list-style: none;
+}
+
+.rv-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.rv-details summary::before {
+  content: "+ ";
+  font-weight: 650;
+}
+
+.rv-details[open] summary::before {
+  content: "− ";
+}
+
 .rv-caveat {
   margin: 0 0 12px;
   padding: 9px 12px;

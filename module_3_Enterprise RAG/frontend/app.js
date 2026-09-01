@@ -254,6 +254,7 @@ const RAGVIZ_SAMPLE_QUERIES = [
 
 let ragvizDoc = null;
 let ragvizChunks = null;
+let ragvizQueryTerms = [];
 
 function ragvizStep(n, title, subtitle) {
   const wrap = document.createElement("div");
@@ -341,26 +342,108 @@ function renderRagvizChunks(container, data) {
   }
 }
 
+// A picture of what "turn a chunk into numbers" means: two sparse rows, the
+// slots they share, and the multiply that scores the match. Drawn from the
+// chunk's real top terms so it is never a generic stock diagram.
+function buildVectorDiagram(chunk, queryTerms) {
+  const SLOTS = 26;
+  const CELL = 15;
+  const GAP = 3;
+  const LEFT = 96;
+  const W = LEFT + SLOTS * (CELL + GAP) + 46;
+
+  const terms = (chunk.top_terms || []).slice(0, 3);
+  // Spread the chunk's real terms across the row; the rest stay zero.
+  const chunkSlots = [4, 11, 19].slice(0, terms.length);
+  // A question only lines up on the words it actually shares. When it shares
+  // none, its cells land elsewhere and nothing connects - which is exactly
+  // what a non-match looks like, so the picture must not fake a connection.
+  const shared = terms
+    .map((t, i) => ({ i, slot: chunkSlots[i], hit: (queryTerms || []).includes(t.term) }))
+    .filter((x) => x.hit);
+  const matched = shared.length > 0;
+  const querySlots = matched ? shared.map((x) => x.slot) : [8, 23];
+
+  const svg = [];
+  svg.push(
+    `<svg viewBox="0 0 ${W} 176" width="100%" height="176" role="img" aria-label="A chunk and a question as two sparse rows of numbers, matched by multiplying them">`
+  );
+
+  const row = (y, label, filled, cls) => {
+    svg.push(
+      `<text x="0" y="${y + 11}" class="vd-label">${label}</text>`
+    );
+    for (let i = 0; i < SLOTS; i++) {
+      const x = LEFT + i * (CELL + GAP);
+      const on = filled.includes(i);
+      svg.push(
+        `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="3" class="vd-cell ${on ? cls : "vd-zero"}"/>`
+      );
+    }
+  };
+
+  // the chunk's row
+  row(46, "This chunk", chunkSlots, "vd-on");
+  // the question's row
+  row(118, "Your question", querySlots, "vd-on-q");
+
+  // word labels above the filled chunk cells
+  terms.forEach((t, i) => {
+    const x = LEFT + chunkSlots[i] * (CELL + GAP) + CELL / 2;
+    svg.push(`<text x="${x}" y="34" class="vd-term">${t.term}</text>`);
+    svg.push(`<text x="${x}" y="${46 + CELL + 13}" class="vd-weight">${t.weight.toFixed(2)}</text>`);
+  });
+
+  // connectors only where both rows genuinely fill the same slot
+  if (matched) {
+    querySlots.forEach((slot) => {
+      const x = LEFT + slot * (CELL + GAP) + CELL / 2;
+      svg.push(`<line x1="${x}" y1="${46 + CELL + 18}" x2="${x}" y2="114" class="vd-link"/>`);
+    });
+  }
+
+  svg.push(`<text x="0" y="16" class="vd-caption">one slot per word in the library — nearly all zero</text>`);
+  svg.push(
+    `<text x="${LEFT}" y="170" class="vd-caption">${
+      matched
+        ? "shared slots are the entire score — that multiply is the whole comparison"
+        : "no shared slots, so the rows multiply out to nothing: this chunk is not a match"
+    }</text>`
+  );
+  svg.push("</svg>");
+  return svg.join("");
+}
+
 function renderRagvizVectors(container, data) {
   const first = data.chunks[0] || {};
-  const vocab = (data.vocabulary_size || 0).toLocaleString();
 
   const note = document.createElement("p");
   note.className = "rv-note";
   note.textContent =
-    `Each chunk becomes a row of ${vocab} numbers — one slot for every distinct word in the whole library. ` +
-    `Nearly all of them are zero: the first chunk below fills only ${first.nonzero_terms || 0} of those ${vocab} slots. ` +
-    "A word scores high when it is frequent in this chunk but rare everywhere else, which is exactly what makes a chunk findable. " +
-    "Your question gets turned into a row the same way, and “does this chunk match?” becomes multiplying the two rows together — arithmetic, not reading.";
+    "Every chunk becomes a row of numbers — one slot per word in the library, nearly all of them zero. " +
+    "A word scores high when it is rare everywhere else. Your question becomes a row the same way, and matching is just multiplying the two rows together.";
   container.appendChild(note);
+
+  const fig = document.createElement("div");
+  fig.className = "vd-figure";
+  fig.innerHTML = buildVectorDiagram(first, ragvizQueryTerms);
+  container.appendChild(fig);
 
   const caveat = document.createElement("p");
   caveat.className = "rv-caveat";
   caveat.textContent =
-    "Worth being precise: this is TF-IDF, which counts words. It is not a neural embedding and it does not understand meaning. " +
-    "Ask for “payment terms” and it finds a chunk containing those words, but it will miss one that says “invoicing schedule” instead. " +
-    "Swapping in a real embedding model is the main upgrade path from this demo — everything else here stays the same.";
+    "This is TF-IDF: it counts words, it does not understand them. Ask for “payment terms” and it finds those words — a chunk saying “invoicing schedule” is invisible to it. Swapping in a real embedding model is the main upgrade from here.";
   container.appendChild(caveat);
+
+  const detail = document.createElement("details");
+  detail.className = "rv-details";
+  const sum = document.createElement("summary");
+  sum.textContent = "Show the actual weights";
+  detail.appendChild(sum);
+  const inner = document.createElement("div");
+  detail.appendChild(inner);
+  container.appendChild(detail);
+  container = inner;
 
   data.chunks.slice(0, 4).forEach((c, i) => {
     const row = document.createElement("div");
@@ -496,7 +579,15 @@ async function runRagvizQuery(query) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query }),
     });
-    renderRagvizScores(body, await res.json());
+    const data = await res.json();
+    ragvizQueryTerms = data.query_terms || [];
+    renderRagvizScores(body, data);
+    // Redraw the diagram so it shows this question's overlap, not the last one's.
+    const vb = document.getElementById("rv-vectors-body");
+    if (vb && ragvizChunks) {
+      vb.innerHTML = "";
+      renderRagvizVectors(vb, ragvizChunks);
+    }
   } catch (err) {
     body.innerHTML = '<p class="rv-note">Could not score that question.</p>';
   }
