@@ -20,6 +20,7 @@ venv/
 # browser automation scratch output
 .playwright-mcp/
 
-# Built embedding index: regenerate with backend/build_index.py rather than
-# committing one provider's vectors (they are useless to a different provider).
+# Built embedding index: 13MB of vectors, regenerated with
+# backend/build_index.py. Vercel gets it via .vercelignore not excluding it,
+# but git does not need a binary-ish blob that changes whenever docs change.
 module_3_Enterprise RAG/index/

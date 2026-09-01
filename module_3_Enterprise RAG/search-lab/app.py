@@ -16,10 +16,15 @@ import os
 import re
 import threading
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+# The module's .env lives one level up; without loading it the lab has no
+# OPENAI_API_KEY and no EMBEDDING_PROVIDER, and silently falls back to defaults.
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
 
 app = FastAPI(title="Search Lab")
 app.add_middleware(
@@ -137,38 +142,25 @@ def keyword_search(query: str, documents: list[str]) -> dict:
 
 # ------------------------------------------------------ semantic retrieval
 
-_model = None
-_model_lock = threading.Lock()
-_model_error: str | None = None
-MODEL_NAME = os.environ.get("EMBEDDING_MODEL", "nomic-ai/nomic-embed-text-v1.5")
+# Same provider the main assistant uses, so one env var switches both:
+#   EMBEDDING_PROVIDER=openai   text-embedding-3-small over the API
+#   EMBEDDING_PROVIDER=local    nomic-embed-text-v1.5, offline, no key
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend"))
+import embeddings  # noqa: E402
 
-# Nomic is trained with task prefixes and quietly gets worse without them: a
-# stored passage is "search_document: ...", a question is "search_query: ...".
-DOC_PREFIX = "search_document: "
-QUERY_PREFIX = "search_query: "
-
-
-def get_model():
-    global _model, _model_error
-    with _model_lock:
-        if _model is None and _model_error is None:
-            try:
-                from sentence_transformers import SentenceTransformer
-
-                _model = SentenceTransformer(MODEL_NAME, trust_remote_code=True)
-            except Exception as exc:
-                _model_error = str(exc)
-    if _model is None:
-        raise RuntimeError(_model_error or "embedding model unavailable")
-    return _model
+_warm_error: str | None = None
+_warmed = False
 
 
 def warm_model() -> None:
+    global _warm_error, _warmed
     try:
-        m = get_model()
-        print(f"[search-lab] {MODEL_NAME} ready, {m.get_sentence_embedding_dimension()} dims")
+        embeddings.embed_query("warm up")
+        _warmed = True
+        print(f"[search-lab] embeddings ready: {embeddings.model_name()}")
     except Exception as exc:
-        print(f"[search-lab] embedding model unavailable: {exc}")
+        _warm_error = str(exc)
+        print(f"[search-lab] embeddings unavailable: {exc}")
 
 
 @app.on_event("startup")
@@ -177,16 +169,13 @@ def _warm():
 
 
 def semantic_search(query: str, documents: list[str]) -> dict:
-    # Cosine by hand with numpy rather than scipy: importing scipy alongside
-    # torch pulls in a second OpenMP runtime, which segfaults on macOS.
+    # Cosine by hand with numpy: importing scipy alongside torch pulls in a
+    # second OpenMP runtime, which segfaults on macOS.
     import numpy as np
 
-    model = get_model()
-    doc_vecs = model.encode([DOC_PREFIX + d for d in documents])
-    q_vec = model.encode(QUERY_PREFIX + query)
+    doc_vecs = embeddings.embed_documents(documents)
+    q_vec = embeddings.embed_query(query)
 
-    # The notebook uses cosine DISTANCE; similarity is easier to read next to
-    # a keyword score, so report both.
     q = np.asarray(q_vec, dtype=float)
     q_norm = float(np.linalg.norm(q)) or 1.0
 
@@ -202,10 +191,9 @@ def semantic_search(query: str, documents: list[str]) -> dict:
     rows.sort(key=lambda r: -r["score"])
     return {
         "results": rows,
-        "model": MODEL_NAME,
-        "dimensions": int(model.get_sentence_embedding_dimension()),
-        "doc_prefix": DOC_PREFIX,
-        "query_prefix": QUERY_PREFIX,
+        "model": embeddings.model_name(),
+        "provider": embeddings.provider(),
+        "dimensions": len(doc_vecs[0]) if doc_vecs else 0,
     }
 
 
@@ -214,9 +202,9 @@ def semantic_search(query: str, documents: list[str]) -> dict:
 class SearchRequest(BaseModel):
     query: str
     documents: list[str] | None = None
-    # Nomic's similarity floor is high - unrelated text still scores ~0.3-0.5.
-    # 0.55 is where relevant and irrelevant separate cleanly on these documents.
-    threshold: float = 0.55
+    # Left unset so it can follow the provider: every embedding model has its
+    # own similarity floor, and a threshold tuned for one is wrong for another.
+    threshold: float | None = None
 
 
 @app.get("/api/setup")
@@ -225,15 +213,19 @@ def setup():
         "documents": DEFAULT_DOCUMENTS,
         "samples": SAMPLE_QUERIES,
         "tokenizer": TOKENIZER,
-        "model": MODEL_NAME,
-        "model_ready": _model is not None,
-        "model_error": _model_error,
+        "model": embeddings.model_name(),
+        "provider": embeddings.provider(),
+        "model_ready": _warmed,
+        "model_error": _warm_error,
     }
 
 
 @app.post("/api/search")
 def search(req: SearchRequest):
     documents = req.documents or DEFAULT_DOCUMENTS
+    # nomic scores unrelated text around 0.3-0.5; OpenAI sits much lower.
+    default_threshold = 0.55 if embeddings.provider() == "local" else 0.30
+    threshold = req.threshold if req.threshold is not None else default_threshold
     keyword = keyword_search(req.query, documents)
 
     try:
@@ -248,13 +240,13 @@ def search(req: SearchRequest):
     if semantic:
         kw_hits = {r["doc"] for r in keyword["results"] if r["matched"]}
         sem_hits = {
-            r["doc"] for r in semantic["results"] if r["score"] >= req.threshold
+            r["doc"] for r in semantic["results"] if r["score"] >= threshold
         }
         verdict = {
             "keyword_only": sorted(kw_hits - sem_hits),
             "semantic_only": sorted(sem_hits - kw_hits),
             "both": sorted(kw_hits & sem_hits),
-            "threshold": req.threshold,
+            "threshold": threshold,
         }
 
     return {

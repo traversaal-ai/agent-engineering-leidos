@@ -24,11 +24,18 @@ TOP_K = 8
 # so without a floor an off-topic question returns the least-bad chunks anyway
 # and the model dutifully cites them.
 #
-# The right value is model-specific, so it cannot be one constant. Measured on
-# this corpus with nomic: on-topic questions score 0.64-0.77 and off-topic ones
-# reach 0.60, so 0.62 separates them - narrowly. The OpenAI default is the
-# usual range for text-embedding-3-small and should be re-measured against a
-# handful of off-topic questions before anyone relies on it.
+# The right value is model-specific, so it cannot be one constant. Both figures
+# below were measured on this corpus, five on-topic questions against four
+# off-topic ones:
+#
+#   openai  on-topic 0.469-0.699, off-topic peaks at 0.245. A wide gap, so 0.30
+#           sits clear of the noise while keeping weaker but real matches.
+#   local   on-topic 0.639-0.773, off-topic reaches 0.596. Much tighter, hence
+#           the higher and less comfortable 0.62.
+#
+# The gap being four times wider under OpenAI is itself worth showing: a better
+# embedding model does not just rank better, it makes "no good match" separable
+# from "a weak match" at all.
 DEFAULT_MIN_SCORE = {"openai": 0.30, "local": 0.62}
 FALLBACK_MIN_SCORE = 0.30
 
