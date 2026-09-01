@@ -26,6 +26,47 @@ Every module in this repo works the same way: learn the concept, then build it, 
 | **6** | Guardrails, Evaluations & Reliability | Add safety, compliance, and injection guardrails. Test accuracy, tool use, and failure cases. Monitor regressions with judges and human review. |
 | **7** | Demo Day | Showcase what you built. See [Demo Day](#demo-day) below for the format. |
 
+## Two apps you can open right now
+
+Most of this repo is built by you, in the session. Module 3 also ships two
+finished apps, because some things are faster to show than to describe. Both are
+deployed and both run locally.
+
+### Alex — [`module_3_Enterprise RAG/`](module_3_Enterprise%20RAG/)
+
+An assistant you can take apart. Alex runs at four levels, and each level turns
+on exactly one more capability:
+
+`LLM -> Chatbot -> Tool-Using Agent -> RAG-Enabled Assistant`
+
+Ask the same question at Level 1 and Level 2 and watch a follow-up start
+working — not because anything was remembered, but because the whole transcript
+is re-sent. The debug panel shows the actual API request behind every reply:
+one `system` string, one `messages` array, and RAG's contribution already
+concatenated into the first of them. That is the point of the module. **RAG is
+string concatenation with a search step in front of it**, and Alex is built so
+you can prove that to yourself rather than take it on faith.
+
+Live: **https://alex-enterprise-rag.vercel.app**
+
+### Search Lab — [`module_3_Enterprise RAG/search-lab/`](module_3_Enterprise%20RAG/search-lab/)
+
+Keyword retrieval and semantic retrieval, running side by side on the same
+documents for the same question. Ask it `feline hunting rodents` — not one of
+those words appears in the library, so keyword search returns **nothing** while
+semantic search finds the right document immediately. Ask `cat that chases
+mouse` and keyword search returns the *wrong* document, confidently, because
+"mice" is not "mouse".
+
+The corpus is an editable text box, so the room can add a sentence and break it
+live. That gap is the argument for everything Module 3 builds on top.
+
+Live: **https://alex-enterprise-rag.vercel.app/lab**
+
+Both sit behind one password, because live model credentials sit behind them —
+your facilitator has it. Running them locally needs no password at all; each
+module README has the commands.
+
 ## Demo Day
 
 - **Format:** 3-5 minute presentation plus a live demo, in teams of 5.
@@ -85,7 +126,7 @@ cd agent-engineering-leidos
 1. **Read the study material first.** Every module's `study-material/lesson.md` teaches the concepts before you touch a tool.
 2. **Do the hands-on part for real.** Nothing in this course is a toy exercise you copy-paste through. Module 1, for example, has you generate an actual PRD for an actual idea, then build an actual app from it.
 3. **Use `reference/` when you want more depth** than the lesson gives, on things like agent architecture levels or the Claude Code construct anatomy.
-4. **Keep it local first.** No deployment, no backend, no accounts required to complete any module's hands-on work, unless a specific module's content calls for it.
+4. **Keep it local first.** No deployment, no backend, no accounts required to complete any module's hands-on work, unless a specific module's content calls for it. The two deployed apps above are there so you can see the finished thing before you build one; everything they do, they do the same way on your laptop.
 
 ## Who's teaching this
 
