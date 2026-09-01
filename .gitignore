@@ -14,3 +14,5 @@ npm-debug.log*
 # python
 __pycache__/
 *.pyc
+venv/
+.venv/
