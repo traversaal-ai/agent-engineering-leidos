@@ -6,3 +6,7 @@ scikit-learn==1.5.1
 numpy==1.26.4
 requests==2.32.3
 python-dotenv==1.0.1
+
+# search-lab only: the keyword-vs-semantic comparison
+sentence-transformers>=3.0.0
+einops>=0.8.0

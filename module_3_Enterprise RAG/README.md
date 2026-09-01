@@ -112,6 +112,22 @@ usable immediately. `GET /api/health` reports when it is ready.
 | 4 | What is the weather right now? | Documents can't answer, so it searches the web |
 | 4 | Who won the most recent Super Bowl? | Same fallback, different citation style |
 
+## Also in this module: Search Lab
+
+[`search-lab/`](search-lab/) is a frontend for
+[`basic_keyword_semantic_search.py`](basic_keyword_semantic_search.py): keyword
+retrieval and semantic retrieval, running side by side on the same documents for
+the same question.
+
+```bash
+uvicorn --app-dir search-lab app:app --port 8010
+```
+
+Ask it `feline hunting rodents` and keyword search returns **nothing** while
+nomic-embed-text finds the right document instantly. Ask `cat that chases mouse`
+and keyword search returns the *wrong* document confidently. That gap is the
+argument for everything below.
+
 ## What is deliberately naive
 
 Worth saying out loud when you teach this, because the gap between this and a
@@ -120,7 +136,8 @@ production system is the interesting part:
 - **Retrieval is TF-IDF**, not embeddings. It matches words, not meaning. Ask
   for "payment terms" and it finds those words; a chunk saying "invoicing
   schedule" is invisible to it. Swapping in a real embedding model is the single
-  biggest upgrade available here.
+  biggest upgrade available here — and `search-lab/` above shows exactly what
+  that upgrade buys, on documents you can edit live.
 - **No reranker.** Top-k by cosine similarity, nothing more.
 - **No evaluation harness.** Faithfulness, coverage, and hallucination rates
   are exactly what Week 6 is about.
@@ -139,4 +156,7 @@ frontend/
   index.html / styles.css / app.js   chat UI, debug panel, RAG walkthrough
 data/
   *.md      the fictional ACME program documents
+search-lab/
+  app.py    keyword vs semantic retrieval, side by side
+  frontend/ its UI
 ```

@@ -16,3 +16,6 @@ __pycache__/
 *.pyc
 venv/
 .venv/
+
+# browser automation scratch output
+.playwright-mcp/
