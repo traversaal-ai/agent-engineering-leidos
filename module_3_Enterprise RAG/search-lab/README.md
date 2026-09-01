@@ -5,6 +5,9 @@ Both retrievers run over the same documents, for the same question, side by
 side — so the difference between matching **words** and matching **meaning** is
 something the room watches happen rather than something you assert.
 
+Live at https://alex-enterprise-rag.vercel.app/lab, behind the same password as
+the assistant.
+
 ## Run
 
 ```bash
@@ -15,7 +18,9 @@ uvicorn --app-dir search-lab app:app --port 8010
 ```
 
 Open http://localhost:8010. The embedding model loads on a background thread at
-startup; the header says when it is ready.
+startup; the header says when it is ready. No password locally: `APP_PASSWORD`
+is unset in the module's `.env`, so the gate reports itself as not required and
+never appears.
 
 ## What each side does
 
@@ -23,7 +28,7 @@ startup; the header says when it is ready.
 |---|---|---|
 | Index | inverted index: word → document ids | one vector per document |
 | Score | `tf × log(N / (df + 1))`, summed over query words | cosine similarity |
-| Model | none | `nomic-ai/nomic-embed-text-v1.5`, 768 dims |
+| Model | none | `EMBEDDING_PROVIDER=openai`: `text-embedding-3-small`, 1536 dims. `local`: `nomic-ai/nomic-embed-text-v1.5`, 768 dims, offline |
 | Fails when | the question uses different words | rarely, on this scale |
 
 The keyword side reproduces the notebook exactly, including its scoring

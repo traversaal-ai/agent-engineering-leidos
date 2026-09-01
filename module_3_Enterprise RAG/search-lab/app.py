@@ -14,6 +14,7 @@ queries prefixed differently - a real detail people get wrong in production.
 import math
 import os
 import re
+import sys
 import threading
 
 from dotenv import load_dotenv
@@ -147,6 +148,10 @@ def keyword_search(query: str, documents: list[str]) -> dict:
 #   EMBEDDING_PROVIDER=local    nomic-embed-text-v1.5, offline, no key
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend"))
 import embeddings  # noqa: E402
+import gate  # noqa: E402
+
+# See gate.py. Disabled when APP_PASSWORD is unset, which is the local default.
+gate.install(app)
 
 _warm_error: str | None = None
 _warmed = False

@@ -10,5 +10,7 @@ data/
 basic_keyword_semantic_search.py
 requirements-build.txt
 
-# Needs its own deployment if it is ever wanted publicly.
-search-lab/
+# The Search Lab ships too, mounted at /lab by api/lab.py. Its own
+# requirements pull in torch (~525MB, past the function size limit) and are
+# only for running the offline embedding provider locally.
+search-lab/requirements.txt

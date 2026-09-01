@@ -1,4 +1,5 @@
-const API = "/api";
+// Relative, not "/api": served at / locally and at /lab/ in the deployment.
+const API = "api";
 
 const documentsInput = document.getElementById("documents");
 const resetDocsBtn = document.getElementById("reset-docs");
@@ -366,4 +367,67 @@ async function init() {
   applyEngineVisibility();
 }
 
-init();
+// --- Access gate -----------------------------------------------------------
+// The deployment sits behind a password because live API keys are behind it.
+// Locally APP_PASSWORD is unset, the gate reports itself as not required, and
+// none of this runs. The cookie is shared with the assistant, so one login
+// covers both.
+
+const gateEl = document.getElementById("gate");
+const gateForm = document.getElementById("gate-form");
+const gatePassword = document.getElementById("gate-password");
+const gateError = document.getElementById("gate-error");
+const gateSubmit = document.getElementById("gate-submit");
+
+function showGate(message) {
+  gateEl.hidden = false;
+  if (message) {
+    gateError.textContent = message;
+    gateError.hidden = false;
+  }
+  gatePassword.focus();
+}
+
+gateForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  gateError.hidden = true;
+  gateSubmit.disabled = true;
+  gateSubmit.textContent = "Checking...";
+  try {
+    const res = await fetch(`${API}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: gatePassword.value }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      gateEl.hidden = true;
+      init();
+    } else {
+      gateError.textContent = data.error || "Incorrect password.";
+      gateError.hidden = false;
+      gatePassword.select();
+    }
+  } catch (err) {
+    gateError.textContent = "Could not reach the server.";
+    gateError.hidden = false;
+  } finally {
+    gateSubmit.disabled = false;
+    gateSubmit.textContent = "Enter";
+  }
+});
+
+async function bootstrap() {
+  try {
+    const gate = await (await fetch(`${API}/gate`)).json();
+    if (!gate.required) return init();
+    // A valid cookie from an earlier visit means no need to ask again.
+    const probe = await fetch(`${API}/setup`);
+    if (probe.ok) return init();
+    showGate();
+  } catch (err) {
+    showGate("Could not reach the server.");
+  }
+}
+
+bootstrap();

@@ -101,6 +101,25 @@ Open http://localhost:8000.
 The document index builds on a background thread at startup, so the app is
 usable immediately. `GET /api/health` reports when it is ready.
 
+## Deployed
+
+| | |
+|---|---|
+| Assistant | https://alex-enterprise-rag.vercel.app |
+| Search Lab | https://alex-enterprise-rag.vercel.app/lab |
+
+Both sit behind one password, because live Anthropic, OpenAI and Tavily keys sit
+behind them and an open URL is an open invitation to spend someone else's
+credits. `APP_PASSWORD` mints a signed cookie; without it every `/api/` route
+returns 401, including the chat stream. One login covers both apps.
+
+The gate is deliberately off locally — `APP_PASSWORD` is unset in `.env`, so
+nothing asks you for a password while you are building.
+
+```bash
+vercel --prod
+```
+
 ## Try these
 
 | Level | Ask this | Then this |
@@ -122,6 +141,13 @@ the same question.
 ```bash
 uvicorn --app-dir search-lab app:app --port 8010
 ```
+
+Its own app, its own port. In the deployment it is served at
+[`/lab`](https://alex-enterprise-rag.vercel.app/lab) rather than as a second
+Vercel project, because a project's bundle cannot reach above its root and the
+lab imports this module's embeddings provider. It is deployable at all because
+`EMBEDDING_PROVIDER` defaults to `openai`; the offline nomic model drags in
+~525MB of torch, far past the function size limit. Locally either works.
 
 Ask it `feline hunting rodents` and keyword search returns **nothing** while
 nomic-embed-text finds the right document instantly. Ask `cat that chases mouse`

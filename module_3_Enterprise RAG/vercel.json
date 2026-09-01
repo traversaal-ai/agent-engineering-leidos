@@ -1,10 +1,14 @@
 {
   "functions": {
     "api/index.py": {
-      "memory": 1024,
       "maxDuration": 300,
-      "includeFiles": "{index/**,frontend/**,backend/**}"
+      "includeFiles": "{index/**,frontend/**,backend/**,search-lab/**}"
     }
   },
-  "routes": [{ "src": "/(.*)", "dest": "api/index.py" }]
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api/index.py"
+    }
+  ]
 }
