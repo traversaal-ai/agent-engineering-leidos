@@ -617,6 +617,68 @@ ragvizBtn.addEventListener("click", openRagviz);
 ragvizCloseBtn.addEventListener("click", closeRagviz);
 ragvizBackdrop.addEventListener("click", closeRagviz);
 
+// --- Access gate -----------------------------------------------------------
+// The deployed demo sits behind a password because live API keys are behind
+// it. Locally APP_PASSWORD is unset, the gate reports itself as not required,
+// and none of this runs.
+
+const gateEl = document.getElementById("gate");
+const gateForm = document.getElementById("gate-form");
+const gatePassword = document.getElementById("gate-password");
+const gateError = document.getElementById("gate-error");
+const gateSubmit = document.getElementById("gate-submit");
+
+function showGate(message) {
+  gateEl.hidden = false;
+  if (message) {
+    gateError.textContent = message;
+    gateError.hidden = false;
+  }
+  gatePassword.focus();
+}
+
+gateForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  gateError.hidden = true;
+  gateSubmit.disabled = true;
+  gateSubmit.textContent = "Checking...";
+  try {
+    const res = await fetch(`${API_BASE}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: gatePassword.value }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      gateEl.hidden = true;
+      startApp();
+    } else {
+      gateError.textContent = data.error || "Incorrect password.";
+      gateError.hidden = false;
+      gatePassword.select();
+    }
+  } catch (err) {
+    gateError.textContent = "Could not reach the server.";
+    gateError.hidden = false;
+  } finally {
+    gateSubmit.disabled = false;
+    gateSubmit.textContent = "Enter";
+  }
+});
+
+async function bootstrap() {
+  try {
+    const gate = await (await fetch(`${API_BASE}/gate`)).json();
+    if (!gate.required) return startApp();
+    // A valid cookie from an earlier visit means no need to ask again.
+    const probe = await fetch(`${API_BASE}/health`);
+    if (probe.ok) return startApp();
+    showGate();
+  } catch (err) {
+    showGate("Could not reach the server.");
+  }
+}
+
 function updateBanner() {
   const info = LEVEL_INFO[currentLevel];
   levelBanner.innerHTML = `<strong>${info.label}</strong><br/>${info.explanation}`;
@@ -1582,5 +1644,9 @@ debugCheckbox.addEventListener("change", () => {
 debugCloseBtn.addEventListener("click", () => setDebugPanelOpen(false));
 debugBackdrop.addEventListener("click", () => setDebugPanelOpen(false));
 
-updateBanner();
-updateKnowledgeBaseVisibility();
+function startApp() {
+  updateBanner();
+  updateKnowledgeBaseVisibility();
+}
+
+bootstrap();

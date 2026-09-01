@@ -10,6 +10,8 @@ One chatbot architecture, capabilities layered on by `level`:
 
 Responses stream token-by-token over SSE (`/api/chat/stream`).
 """
+import hashlib
+import hmac
 import json
 import os
 import threading
@@ -19,7 +21,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from rag import (
@@ -53,6 +55,70 @@ def warm_rag_index():
     """Build the PDF vector index in the background at boot, so the first
     Level 4 question during a demo doesn't wait on a 7.5MB PDF parse."""
     threading.Thread(target=warm_store, daemon=True).start()
+
+
+# --- Access gate -----------------------------------------------------------
+# Vercel's own password protection needs a paid plan, and this app is deployed
+# with live API keys behind it: an open URL means anyone can spend the owner's
+# credits. When APP_PASSWORD is set, every API call needs a signed cookie that
+# only the password can mint. Unset (the default, so local runs are unchanged)
+# the gate is disabled entirely.
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+AUTH_COOKIE = "alex_access"
+
+# Signed rather than storing the password in the cookie, so a leaked cookie
+# does not reveal the password itself.
+_AUTH_TOKEN = (
+    hmac.new(APP_PASSWORD.encode(), b"alex-access-v1", hashlib.sha256).hexdigest()
+    if APP_PASSWORD
+    else ""
+)
+
+PUBLIC_PATHS = {"/api/login", "/api/gate"}
+
+
+class LoginRequest(BaseModel):
+    password: str
+
+
+@app.get("/api/gate")
+def gate():
+    """Whether a password is required, and whether this caller already has it."""
+    return {"required": bool(APP_PASSWORD)}
+
+
+@app.post("/api/login")
+def login(req: LoginRequest):
+    if not APP_PASSWORD:
+        return JSONResponse({"ok": True})
+    if not hmac.compare_digest(req.password.strip(), APP_PASSWORD):
+        return JSONResponse({"ok": False, "error": "Incorrect password."}, status_code=401)
+
+    response = JSONResponse({"ok": True})
+    response.set_cookie(
+        AUTH_COOKIE,
+        _AUTH_TOKEN,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=60 * 60 * 12,
+    )
+    return response
+
+
+@app.middleware("http")
+async def require_password(request, call_next):
+    path = request.url.path
+    if (
+        APP_PASSWORD
+        and path.startswith("/api/")
+        and path not in PUBLIC_PATHS
+        and not hmac.compare_digest(
+            request.cookies.get(AUTH_COOKIE, ""), _AUTH_TOKEN
+        )
+    ):
+        return JSONResponse({"error": "password required"}, status_code=401)
+    return await call_next(request)
 
 
 class ChatMessage(BaseModel):

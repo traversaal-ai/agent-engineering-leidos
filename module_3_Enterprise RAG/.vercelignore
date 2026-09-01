@@ -2,6 +2,13 @@ venv/
 __pycache__/
 *.pyc
 .env
-search-lab/
-requirements-build.txt
+
+# Build-time only. The index already contains every chunk's text, so the
+# function never reads the source documents.
+Project-Management-2nd-Edition-1729807212.pdf
+data/
 basic_keyword_semantic_search.py
+requirements-build.txt
+
+# Needs its own deployment if it is ever wanted publicly.
+search-lab/

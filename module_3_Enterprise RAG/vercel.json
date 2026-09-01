@@ -1,11 +1,10 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/index.py": {
-      "memory": 1769,
+      "memory": 1024,
       "maxDuration": 300,
-      "includeFiles": "{data/**,frontend/**,backend/**,Project-Management-2nd-Edition-1729807212.pdf}"
+      "includeFiles": "{index/**,frontend/**,backend/**}"
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+  "routes": [{ "src": "/(.*)", "dest": "api/index.py" }]
 }
