@@ -1315,8 +1315,8 @@ function renderDebug() {
     block("System prompt with retrieved context", pre(debug.system_prompt_with_context));
   }
 
-  if (debug.messages_sent_to_llm) {
-    block("Same thing, as raw JSON", pre(debug.messages_sent_to_llm));
+  if (debug.api_request) {
+    block("The actual API request", pre(debug.api_request));
   }
 }
 

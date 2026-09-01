@@ -153,6 +153,25 @@ def jsonable(value):
     return value
 
 
+def api_request(system, messages, tools=None) -> dict:
+    """The request body as the SDK will send it.
+
+    The debug panel shows this verbatim, because it is the whole argument: there
+    is no retrieval channel and no memory field. `system` is one string that we
+    concatenated, `messages` is a list we re-send in full every turn, and
+    everything RAG contributes is already inside that first string.
+    """
+    body = {
+        "model": MODEL,
+        "max_tokens": MAX_TOKENS,
+        "system": system,
+        "messages": jsonable(messages),
+    }
+    if tools is not None:
+        body["tools"] = tools
+    return body
+
+
 def format_search_results(result: dict) -> str:
     """Hand the model readable, clearly-attributed results. The URL has to be
     right next to the text it belongs to, or the model cannot cite it."""
@@ -319,7 +338,7 @@ def run_level1(message: str):
     debug = {
         "level": 1,
         "description": "Only the current message is sent. No history, no tools, no retrieval.",
-        "messages_sent_to_llm": messages,
+        "api_request": api_request(BASE_SYSTEM, messages),
         "llm_input": transcript([PERSONA_PART], messages, 0),
         "what_got_added": "Nothing. Just the one message you typed. Level 1 never appends earlier turns, so each call starts from scratch.",
     }
@@ -336,7 +355,7 @@ def run_level2(message: str, history: list[ChatMessage]):
         "level": 2,
         "description": "Full conversation history plus the current message is sent.",
         "conversation_history_included": as_dicts(history),
-        "messages_sent_to_llm": messages,
+        "api_request": api_request(BASE_SYSTEM, messages),
         "llm_input": transcript([PERSONA_PART], messages, len(history)),
         "what_got_added": (
             "%d earlier message(s) were concatenated in front of your new one. "
@@ -357,7 +376,7 @@ def run_level3(message: str, history: list[ChatMessage]):
     debug = {
         "level": 3,
         "description": "History is sent along with a web_search tool the model may call.",
-        "messages_sent_to_llm": list(messages),
+        "api_request": api_request(LEVEL3_SYSTEM, messages, [WEB_SEARCH_TOOL]),
         "tool_calls": [],
     }
 
@@ -435,7 +454,7 @@ def run_level4(message: str, history: list[ChatMessage]):
         "min_similarity_threshold": store.min_score,
         "retrieved_chunks": sources,
         "system_prompt_with_context": system_prompt,
-        "messages_sent_to_llm": list(messages),
+        "api_request": api_request(system_prompt, messages, [WEB_SEARCH_TOOL]),
         "tool_calls": [],
     }
 
