@@ -80,6 +80,8 @@ cross-column badges are suppressed, so nothing gives the reveal away early.
 
 ## Why this is here
 
-Module 3's main assistant uses TF-IDF for retrieval, which is honest about what
-it is but is not how enterprise RAG is actually built. This lab is the argument
-for the upgrade: same corpus, same questions, and a visible gap between the two.
+Module 3's main assistant retrieves with embeddings, which is how enterprise
+RAG is actually built — and which makes the choice invisible, because it simply
+works. This lab is where the choice is made visible: same corpus, same
+questions, keyword and meaning side by side, and a gap you watch open rather
+than take on faith.

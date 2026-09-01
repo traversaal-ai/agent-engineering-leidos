@@ -5,8 +5,8 @@ One chatbot architecture, capabilities layered on by `level`:
   1: LLM only              -> user message in, response out. No history.
   2: + conversation history-> full message list sent to the LLM.
   3: + web search tool      -> LLM can call web_search when it needs current info.
-  4: + RAG                  -> query embedded (TF-IDF), relevant doc chunks
-                               retrieved and injected as context.
+  4: + RAG                  -> query embedded, nearest chunks retrieved from a
+                               prebuilt index and injected as context.
 
 Responses stream token-by-token over SSE (`/api/chat/stream`).
 """

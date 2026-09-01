@@ -51,8 +51,8 @@ system:
 
 1. Pick a document.
 2. See it cut into chunks, with the overlapping text between them highlighted.
-3. See each chunk turned into weighted terms — and read the caveat about why
-   TF-IDF is not a neural embedding.
+3. See each chunk turned into the numbers a model actually compares — the
+   vector it was embedded into.
 4. Type a question and watch all ~780 chunks get scored and ranked, with the
    losers labelled `cut by top-k` or `below threshold`.
 
@@ -75,7 +75,8 @@ They interlock on purpose. A late deliverable shows up as an action item in the
 kickoff notes, an escalation in the status review, and risk R-02 in the
 register, so follow-up questions have to chain across documents.
 
-Drop any `.md` or `.txt` file into `data/` and it is indexed on the next restart.
+Drop any `.md` or `.txt` file into `data/`, re-run `python backend/build_index.py`,
+and it joins the index.
 
 ## Setup
 
@@ -86,8 +87,30 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Set `ANTHROPIC_API_KEY` in `.env`. `TAVILY_API_KEY` is optional — without it,
-web search returns clearly-labelled mock results and the UI says so.
+Set `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` in `.env` — Anthropic answers,
+OpenAI embeds. `TAVILY_API_KEY` is optional; without it, web search returns
+clearly-labelled mock results and the UI says so.
+
+Then build the retrieval index, once:
+
+```bash
+python backend/build_index.py
+```
+
+`index/` is gitignored — 12MB of vectors that change whenever the documents do —
+so a fresh clone starts without one and Level 4 has nothing to retrieve from.
+The app says as much on startup, naming this exact command. Re-run it whenever
+`data/` or the PDF changes.
+
+To build it without an OpenAI key, use the offline model instead — it needs
+`pip install -r search-lab/requirements.txt` for torch, and the app must then
+also run with `EMBEDDING_PROVIDER=local`. An index is only searchable by the
+model that built it — different models produce unrelated vectors, so `rag.py`
+refuses the mismatch rather than returning quiet nonsense:
+
+```bash
+EMBEDDING_PROVIDER=local python backend/build_index.py
+```
 
 ## Run
 
@@ -159,30 +182,39 @@ argument for everything below.
 Worth saying out loud when you teach this, because the gap between this and a
 production system is the interesting part:
 
-- **Retrieval is TF-IDF**, not embeddings. It matches words, not meaning. Ask
-  for "payment terms" and it finds those words; a chunk saying "invoicing
-  schedule" is invisible to it. Swapping in a real embedding model is the single
-  biggest upgrade available here — and `search-lab/` above shows exactly what
-  that upgrade buys, on documents you can edit live.
-- **No reranker.** Top-k by cosine similarity, nothing more.
+- **No reranker.** Top-k by cosine similarity against one threshold, nothing
+  more. No cross-encoder, no query rewriting, no hybrid keyword-plus-vector
+  scoring — all three are standard in production and all three are absent.
 - **No evaluation harness.** Faithfulness, coverage, and hallucination rates
   are exactly what Week 6 is about.
-- **The vector store is a numpy matrix in memory**, rebuilt on every start. No
-  Pinecone, no Chroma, no FAISS — on purpose, so nothing is hidden behind a
-  service.
+- **The vector store is a numpy matrix**, loaded from a JSON file and searched
+  by one dot product against all 780 chunks. No Pinecone, no Chroma, no FAISS —
+  on purpose, so nothing is hidden behind a service. It is also why the corpus
+  size is the limit: this approach stops being reasonable a couple of orders of
+  magnitude from here.
+- **Chunking is fixed-size**, ~900 characters with 150 of overlap, blind to
+  headings, tables and sentence boundaries. A clause split down the middle is
+  retrieved as two half-answers.
 
 ## Project structure
 
 ```
 backend/
-  main.py   FastAPI app, SSE streaming, the four levels, prompt assembly
-  rag.py    document loading, chunking, TF-IDF vector store, retrieval
-  tools.py  the web_search tool and its Tavily client
+  main.py         FastAPI app, SSE streaming, the four levels, prompt assembly
+  rag.py          loads the prebuilt index, embeds the question, retrieves
+  chunking.py     reads the PDF and data/, cuts them into overlapping windows
+  embeddings.py   the two providers: openai over the API, local via nomic
+  build_index.py  the offline build. Run it whenever the documents change
+  gate.py         the password gate, shared with the Search Lab
+  tools.py        the web_search tool and its Tavily client
 frontend/
   index.html / styles.css / app.js   chat UI, debug panel, RAG walkthrough
 data/
-  *.md      the fictional ACME program documents
+  *.md            the fictional ACME program documents
+index/            the built index: chunk text plus one vector each. Gitignored
+api/
+  index.py        the Vercel entrypoint. Mounts the Search Lab at /lab
 search-lab/
-  app.py    keyword vs semantic retrieval, side by side
-  frontend/ its UI
+  app.py          keyword vs semantic retrieval, side by side
+  frontend/       its UI
 ```

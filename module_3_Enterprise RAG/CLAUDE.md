@@ -18,15 +18,23 @@ exists so nobody has to take that on faith.
 .claude/launch.json     VSCode launch config for the backend
 backend/
   main.py                 FastAPI app: SSE streaming, the four levels, prompt assembly
-  rag.py                  document loading, chunking, TF-IDF store, retrieval
+  rag.py                  loads the prebuilt index, embeds the question, retrieves
+  chunking.py             reads the PDF and data/, cuts overlapping 900-char windows
+  embeddings.py           the two providers: openai over the API, local via nomic
+  build_index.py          the offline index build. Run it when documents change
+  gate.py                 the password gate, shared with the Search Lab
   tools.py                the web_search tool + Tavily client
 frontend/
   index.html              markup, including the debug panel and RAG walkthrough modals
   app.js                  chat, SSE client, markdown renderer, debug panel, RAG walkthrough
   styles.css              all styling; light theme pinned, tokens at the top
 data/
-  *.md                    fictional ACME program documents (indexed at startup)
+  *.md                    fictional ACME program documents
+index/                    the built index: chunk text + one vector each. Gitignored
 Project-Management-...pdf  the general project management reference
+api/
+  index.py                Vercel entrypoint. Mounts the Search Lab at /lab
+search-lab/               keyword vs semantic retrieval, side by side. Its own app
 ```
 
 ## The four levels
@@ -95,12 +103,19 @@ cd backend
 uvicorn main:app --reload --port 8000
 ```
 
-The index builds on a background thread at startup, so boot is instant and the
-first Level 4 question does not wait on a 7MB PDF parse. `GET /api/health`
-reports readiness and document count.
+The index loads on a background thread at startup, so boot is instant.
+`GET /api/health` reports readiness and document count.
 
-Requires `ANTHROPIC_API_KEY` in `.env`. `TAVILY_API_KEY` is optional; without it
-the web search returns mock results and the UI labels them as mocked.
+It has to exist first. `index/` is gitignored (12MB of vectors), so a fresh
+clone needs `python backend/build_index.py` once — chunking and embedding happen
+there, offline, never at request time. That is why the deployed function needs
+no PDF parser and no model weights.
+
+Requires `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` in `.env` — Anthropic answers,
+OpenAI embeds. `TAVILY_API_KEY` is optional; without it the web search returns
+mock results and the UI labels them as mocked. `APP_PASSWORD` is unset locally
+on purpose: the gate is for the deployment, and nobody should be typing a
+password while building.
 
 ## When you change things
 
@@ -108,13 +123,19 @@ the web search returns mock results and the UI labels them as mocked.
   Static files are served with `no-store`, but the version bump makes cache
   problems impossible to blame.
 - Add documents by dropping `.md` or `.txt` into `data/`. Titles come from each
-  file's `# H1`, not the filename. Restart to reindex.
+  file's `# H1`, not the filename. Then re-run `python backend/build_index.py` —
+  a restart alone does nothing, because the app only ever loads `index/`.
 - Sample data must stay clearly fictional and labelled. It describes a made-up
   customer and program; do not make it resemble a real contract or real people.
 
 ## What this module deliberately does not do
 
-TF-IDF instead of embeddings, no reranker, no evaluation harness, an in-memory
-matrix instead of a vector database. These are teaching choices, not oversights
-— the README says so plainly, and the gap between this and production is the
-discussion the module is meant to start. Do not silently "fix" them.
+No reranker, no query rewriting, no hybrid scoring, no evaluation harness,
+fixed-size chunking, and a numpy matrix instead of a vector database. These are
+teaching choices, not oversights — the README says so plainly, and the gap
+between this and production is the discussion the module is meant to start. Do
+not silently "fix" them.
+
+Retrieval itself is no longer on that list. It was TF-IDF, and is now embeddings
+via `embeddings.py`; `search-lab/` is where the difference between the two is
+demonstrated rather than asserted.

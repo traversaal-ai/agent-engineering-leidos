@@ -2,9 +2,13 @@
 Build the retrieval index, offline, once.
 
 Reads the PDF and every markdown file in data/, chunks them, embeds every
-chunk, and writes the result to index/. Committing that output is the point:
-the deployed app then never parses a PDF, never loads a model, and starts
+chunk, and writes the result to index/. Splitting this out is the point: the
+deployed app then never parses a PDF, never loads a model, and starts
 instantly. It only has to embed the incoming question.
+
+index/ is gitignored - 12MB of vectors that change whenever the documents do -
+so a fresh clone has to run this once before the app has anything to retrieve
+from. Vercel gets it from the local directory at deploy time.
 
     python backend/build_index.py                      # OpenAI, needs a key
     EMBEDDING_PROVIDER=local python backend/build_index.py   # offline, no key
