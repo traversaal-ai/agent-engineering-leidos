@@ -1,0 +1,25 @@
+# Module 3: Key Concepts (Glossary)
+
+- **RAG (Retrieval Augmented Generation)**: Retrieves relevant pieces of external data and adds ("augments") them to an LLM's prompt before generation, so the model answers grounded in that data instead of only what it memorized during training.
+- **Context window**: The fixed span of tokens an LLM can attend to at once. Content outside the window is ignored by the model, not remembered.
+- **Hallucination**: An LLM generating a confident but false or unsupported statement, most often because it lacks (or ignores) grounded data.
+- **Embedding**: The numerical representation (a vector) of a piece of data, text, image, or audio, produced so that semantically similar items end up close together in the same vector space.
+- **Vector search**: Search that returns similar items based on their semantic meaning (geometric closeness in embedding space) rather than exact keyword matches.
+- **Vector database**: A database purpose-built to store millions of embeddings and find the most similar ones in milliseconds, e.g. Pinecone, Weaviate, Qdrant, pgvector.
+- **Vector DB vs. relational DB**: A relational database (PostgreSQL, MySQL) is the system of record, found via exact-match SQL. A vector database is the semantic retrieval layer, found via approximate nearest-neighbor search. Used together, not as substitutes.
+- **Chunking**: Breaking data into smaller pieces (chunks) before embedding and storing it, needed because LLMs and embedding models cannot process an entire dataset as one unit.
+- **The five chunking strategies**: Fixed-Size (by character count), Recursive (by a prioritized list of separators), Document-Based (by the document's own structure), Semantic (by where meaning shifts), Agentic (an LLM decides, based on context).
+- **Chunk overlap**: A deliberate duplication of a few sentences at chunk boundaries, so context isn't lost right at the cut point.
+- **Ingestion (RAG Stage 1)**: Load, extract, chunk, embed, and store raw data so it becomes searchable knowledge.
+- **Retrieval (RAG Stage 2)**: Embed a user's query and search the vector database for the most relevant chunks.
+- **Generation (RAG Stage 3)**: Build a prompt from the retrieved chunks and the query, generate an answer, and post-process it (verify, filter, cite).
+- **Naive RAG**: The basic three-stage pipeline with no additional processing: retrieve top-K chunks by embedding similarity, hand them to the LLM, generate an answer.
+- **Naive RAG's general pain points**: irrelevant retrieval, no context awareness, information overload, confusing answers, poor efficiency.
+- **Naive RAG's four specific failure shapes**: struggles to summarize, comparison is a headache, implicit data / multi-hop reasoning, no memory (disconnected dialogue).
+- **Multi-hop reasoning**: Answering a question that requires chaining multiple retrievals together, rather than answering from a single retrieval pass.
+- **No permissions model**: Naive RAG's structural gap, a vector database with no access control returns whatever is semantically closest, regardless of who is asking.
+- **Enterprise RAG**: A RAG architecture that wraps the naive pipeline with additional stages (guardrails, semantic cache, query rewriter, agentic router, access control, citation/provenance, monitoring) to address naive RAG's pain points at production scale.
+- **Semantic cache**: Recognizes when a new query is semantically equivalent to a previously answered one, and reuses the prior answer instead of re-running retrieval and generation.
+- **Query rewriter**: Rewrites or decomposes a raw query, e.g. into sub-questions for a comparison, or into a self-contained question given prior conversation turns.
+- **Agentic router**: Decides which knowledge base(s) a query should be answered from, and enforces access control before retrieval happens.
+- **Citation & provenance**: Attaching sources to claims in a generated answer, so a human can verify the claim against its origin.
