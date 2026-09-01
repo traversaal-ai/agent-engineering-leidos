@@ -51,6 +51,16 @@ ranks: "The cat is playing in the garden" scores above zero, because **"the"**
 matched. That is the other half of the keyword problem — not just missing what
 it should find, but matching on noise.
 
+## Showing them one at a time
+
+The **Show** checkboxes above the results hide either column. Both are on by
+default, and they cannot both be switched off.
+
+The intended flow is to run a query with only **Keyword** ticked, let the room
+look at the answer and commit to whether it is any good, and only then tick
+**Semantic**. While one column is hidden the verdict banner and the
+cross-column badges are suppressed, so nothing gives the reveal away early.
+
 ## Things to try live
 
 - **Edit the documents.** The textarea is the corpus. Add a sentence in your own

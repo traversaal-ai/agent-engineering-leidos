@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=1" />
+<link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body>
   <div class="app">
@@ -52,10 +52,23 @@
         <div id="samples" class="samples"></div>
         <p id="sample-why" class="sample-why" hidden></p>
 
+        <div class="engine-toggles">
+          <span class="toggles-label">Show</span>
+          <label class="toggle keyword">
+            <input type="checkbox" id="show-keyword" checked />
+            Keyword
+          </label>
+          <label class="toggle semantic">
+            <input type="checkbox" id="show-semantic" checked />
+            Semantic
+          </label>
+          <span class="toggles-hint" id="toggles-hint"></span>
+        </div>
+
         <div id="verdict" class="verdict" hidden></div>
 
         <div class="columns">
-          <section class="col">
+          <section class="col" id="col-keyword">
             <div class="col-head keyword">
               <h3>Keyword</h3>
               <span class="col-sub">inverted index + TF-IDF</span>
@@ -69,7 +82,7 @@
             </details>
           </section>
 
-          <section class="col">
+          <section class="col" id="col-semantic">
             <div class="col-head semantic">
               <h3>Semantic</h3>
               <span class="col-sub" id="semantic-sub">embeddings</span>
@@ -83,6 +96,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=1"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

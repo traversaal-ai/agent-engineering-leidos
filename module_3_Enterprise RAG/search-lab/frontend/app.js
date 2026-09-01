@@ -17,6 +17,11 @@ const semanticResults = document.getElementById("semantic-results");
 const semanticSub = document.getElementById("semantic-sub");
 const workingWrap = document.getElementById("working-wrap");
 const workingEl = document.getElementById("working");
+const showKeyword = document.getElementById("show-keyword");
+const showSemantic = document.getElementById("show-semantic");
+const colKeyword = document.getElementById("col-keyword");
+const colSemantic = document.getElementById("col-semantic");
+const togglesHint = document.getElementById("toggles-hint");
 
 let setup = null;
 let lastResponse = null;
@@ -103,7 +108,12 @@ function renderKeyword(data) {
     keywordResults.appendChild(none);
   }
 
-  const semanticOnly = new Set((data.verdict && data.verdict.semantic_only) || []);
+  // Only hint at the other engine's findings when it is actually on screen,
+  // otherwise the badge gives away the reveal.
+  const compare = showSemantic.checked;
+  const semanticOnly = new Set(
+    (compare && data.verdict && data.verdict.semantic_only) || []
+  );
   rows.forEach((r, i) => {
     const missed = r.score <= 0 && semanticOnly.has(r.doc);
     keywordResults.appendChild(
@@ -131,7 +141,10 @@ function renderSemantic(data) {
   const rows = data.semantic.results;
   const max = Math.max(...rows.map((r) => r.score), 0.0001);
   const threshold = (data.verdict && data.verdict.threshold) || 0;
-  const semanticOnly = new Set((data.verdict && data.verdict.semantic_only) || []);
+  const compare = showKeyword.checked;
+  const semanticOnly = new Set(
+    (compare && data.verdict && data.verdict.semantic_only) || []
+  );
 
   rows.forEach((r, i) => {
     const only = semanticOnly.has(r.doc);
@@ -215,6 +228,46 @@ function renderVerdict(data) {
   verdictEl.textContent = text;
 }
 
+
+// Presenters usually want to show one engine, let the room commit to an
+// answer, and only then reveal the other. The verdict compares the two, so it
+// stays hidden until both are on screen.
+function applyEngineVisibility() {
+  const kw = showKeyword.checked;
+  const sem = showSemantic.checked;
+
+  // Never let both be switched off - there would be nothing to look at.
+  if (!kw && !sem) {
+    showSemantic.checked = true;
+    return applyEngineVisibility();
+  }
+
+  colKeyword.hidden = !kw;
+  colSemantic.hidden = !sem;
+
+  const both = kw && sem;
+  verdictEl.classList.toggle("hidden-by-toggle", !both);
+  if (!both) {
+    verdictEl.hidden = true;
+  } else if (lastResponse) {
+    renderVerdict(lastResponse);
+  }
+
+  if (lastResponse) {
+    renderKeyword(lastResponse);
+    renderSemantic(lastResponse);
+  }
+
+  togglesHint.textContent = both
+    ? ""
+    : kw
+    ? "semantic hidden — reveal it once the room has judged these results"
+    : "keyword hidden";
+}
+
+showKeyword.addEventListener("change", applyEngineVisibility);
+showSemantic.addEventListener("change", applyEngineVisibility);
+
 async function runSearch() {
   const query = queryInput.value.trim();
   if (!query) return;
@@ -234,11 +287,11 @@ async function runSearch() {
     const data = await res.json();
     lastResponse = data;
 
-    renderVerdict(data);
     renderKeyword(data);
     renderSemantic(data);
     renderWorking(data);
     workingWrap.hidden = false;
+    applyEngineVisibility();
     if (data.semantic) {
       semanticSub.textContent = `${data.semantic.model.split("/").pop()} · ${data.semantic.dimensions} dims`;
     }
@@ -310,6 +363,7 @@ async function init() {
   }
 
   queryInput.value = (setup.samples && setup.samples[0] && setup.samples[0].query) || "";
+  applyEngineVisibility();
 }
 
 init();

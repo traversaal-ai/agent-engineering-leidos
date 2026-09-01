@@ -256,6 +256,55 @@ body {
   color: var(--muted);
 }
 
+.engine-toggles {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 9px 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.toggles-label {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle input {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.toggle.keyword { color: var(--accent); }
+.toggle.keyword input { accent-color: var(--accent); }
+.toggle.semantic { color: var(--violet); }
+.toggle.semantic input { accent-color: var(--violet); }
+
+.toggles-hint {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  font-style: italic;
+}
+
+.col[hidden] { display: none; }
+
 .verdict {
   margin: 0 0 16px;
   padding: 12px 15px;
