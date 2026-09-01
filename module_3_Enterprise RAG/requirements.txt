@@ -1,12 +1,9 @@
+# Runtime. Deliberately small: the deployed function loads a prebuilt index,
+# so it needs no PDF parser, no scikit-learn, and no model weights.
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 anthropic>=0.40.0
-pypdf==4.3.1
-scikit-learn==1.5.1
-numpy==1.26.4
+openai>=1.40.0
+numpy>=1.26.4
 requests==2.32.3
 python-dotenv==1.0.1
-
-# search-lab only: the keyword-vs-semantic comparison
-sentence-transformers>=3.0.0
-einops>=0.8.0

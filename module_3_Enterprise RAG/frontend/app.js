@@ -102,13 +102,13 @@ const HOW_IT_WORKS = {
         { label: "Extract text", sub: "page by page" },
         { label: "Split into chunks", sub: "~900 chars, 150 overlap" },
         {
-          label: "TF-IDF vectorize",
-          sub: "scikit-learn TfidfVectorizer — statistical word-frequency vectors, not a neural embedding model",
+          label: "Embed each chunk",
+          sub: "an embedding model turns every chunk into a list of numbers that encodes its meaning",
           variant: "rag",
         },
         {
           label: "Stored vector index",
-          sub: "in-memory scipy sparse matrix — no external vector database (no Pinecone/Chroma/FAISS)",
+          sub: "written to index/ and committed — a numpy matrix in memory at runtime, no external vector database",
           variant: "rag",
         },
       ],
@@ -118,7 +118,7 @@ const HOW_IT_WORKS = {
       mergeWith: { label: "Your question" },
       mergeLabel: "matched via similarity",
       steps: [
-        { label: "Vector search", sub: "cosine similarity over TF-IDF vectors", variant: "rag" },
+        { label: "Vector search", sub: "cosine similarity between your question and every chunk", variant: "rag" },
         { label: "Top matching excerpts", sub: "with page # + similarity score", variant: "rag" },
         { label: "Alex", sub: "question + excerpts as context", variant: "accent" },
         {
@@ -205,7 +205,7 @@ function renderKnowledgeBase() {
 
   const total = document.createElement("div");
   total.className = "kb-total";
-  total.textContent = `${kbData.total_chunks.toLocaleString()} chunks indexed · TF-IDF, in memory`;
+  total.textContent = `${kbData.total_chunks.toLocaleString()} chunks · ${kbData.model || "embeddings"}`;
   kbList.appendChild(total);
 }
 
@@ -342,148 +342,71 @@ function renderRagvizChunks(container, data) {
   }
 }
 
-// A picture of what "turn a chunk into numbers" means: two sparse rows, the
-// slots they share, and the multiply that scores the match. Drawn from the
-// chunk's real top terms so it is never a generic stock diagram.
-function buildVectorDiagram(chunk, queryTerms) {
-  const SLOTS = 26;
-  const CELL = 15;
-  const GAP = 3;
-  const LEFT = 96;
-  const W = LEFT + SLOTS * (CELL + GAP) + 46;
+// A picture of what an embedding actually is: a fixed-length list of numbers,
+// most of them small, none of them readable. Drawn from the real vector, not
+// an illustration of one.
+function buildVectorDiagram(chunk, dimensions) {
+  const values = (chunk && chunk.vector_preview) || [];
+  if (!values.length) return "";
 
-  const terms = (chunk.top_terms || []).slice(0, 3);
-  // Spread the chunk's real terms across the row; the rest stay zero.
-  const chunkSlots = [4, 11, 19].slice(0, terms.length);
-  // A question only lines up on the words it actually shares. When it shares
-  // none, its cells land elsewhere and nothing connects - which is exactly
-  // what a non-match looks like, so the picture must not fake a connection.
-  const shared = terms
-    .map((t, i) => ({ i, slot: chunkSlots[i], hit: (queryTerms || []).includes(t.term) }))
-    .filter((x) => x.hit);
-  const matched = shared.length > 0;
-  const querySlots = matched ? shared.map((x) => x.slot) : [8, 23];
+  const CELL = 17;
+  const GAP = 3;
+  const MID = 58;
+  const H = 128;
+  const LEFT = 4;
+  const W = LEFT + values.length * (CELL + GAP) + 8;
+  const max = Math.max(...values.map((v) => Math.abs(v)), 0.001);
 
   const svg = [];
   svg.push(
-    `<svg viewBox="0 0 ${W} 176" width="100%" height="176" role="img" aria-label="A chunk and a question as two sparse rows of numbers, matched by multiplying them">`
+    `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" ` +
+      `aria-label="The first ${values.length} of ${dimensions} numbers that represent this chunk">`
   );
 
-  const row = (y, label, filled, cls) => {
+  svg.push(`<text x="${LEFT}" y="12" class="vd-caption">the first ${values.length} of ${dimensions} numbers for this chunk</text>`);
+  svg.push(`<line x1="${LEFT}" y1="${MID}" x2="${W - 8}" y2="${MID}" class="vd-axis"/>`);
+
+  values.forEach((v, i) => {
+    const x = LEFT + i * (CELL + GAP);
+    const height = Math.max(1.5, (Math.abs(v) / max) * 34);
+    const y = v >= 0 ? MID - height : MID;
     svg.push(
-      `<text x="0" y="${y + 11}" class="vd-label">${label}</text>`
+      `<rect x="${x}" y="${y}" width="${CELL}" height="${height}" rx="2" ` +
+        `class="vd-bar ${v >= 0 ? "pos" : "neg"}"><title>dimension ${i + 1}: ${v}</title></rect>`
     );
-    for (let i = 0; i < SLOTS; i++) {
-      const x = LEFT + i * (CELL + GAP);
-      const on = filled.includes(i);
-      svg.push(
-        `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="3" class="vd-cell ${on ? cls : "vd-zero"}"/>`
-      );
-    }
-  };
-
-  // the chunk's row
-  row(46, "This chunk", chunkSlots, "vd-on");
-  // the question's row
-  row(118, "Your question", querySlots, "vd-on-q");
-
-  // word labels above the filled chunk cells
-  terms.forEach((t, i) => {
-    const x = LEFT + chunkSlots[i] * (CELL + GAP) + CELL / 2;
-    svg.push(`<text x="${x}" y="34" class="vd-term">${t.term}</text>`);
-    svg.push(`<text x="${x}" y="${46 + CELL + 13}" class="vd-weight">${t.weight.toFixed(2)}</text>`);
   });
 
-  // connectors only where both rows genuinely fill the same slot
-  if (matched) {
-    querySlots.forEach((slot) => {
-      const x = LEFT + slot * (CELL + GAP) + CELL / 2;
-      svg.push(`<line x1="${x}" y1="${46 + CELL + 18}" x2="${x}" y2="114" class="vd-link"/>`);
-    });
-  }
-
-  svg.push(`<text x="0" y="16" class="vd-caption">one slot per word in the library — nearly all zero</text>`);
   svg.push(
-    `<text x="${LEFT}" y="170" class="vd-caption">${
-      matched
-        ? "shared slots are the entire score — that multiply is the whole comparison"
-        : "no shared slots, so the rows multiply out to nothing: this chunk is not a match"
-    }</text>`
+    `<text x="${LEFT}" y="${MID + 52}" class="vd-caption">` +
+      `no single number means anything on its own — meaning lives in the whole list, and closeness between two lists is the match` +
+      `</text>`
   );
+  svg.push(`<text x="${LEFT}" y="${MID + 68}" class="vd-caption dim">…and ${dimensions - values.length} more</text>`);
   svg.push("</svg>");
   return svg.join("");
 }
 
 function renderRagvizVectors(container, data) {
   const first = data.chunks[0] || {};
+  const dims = data.dimensions || 0;
 
   const note = document.createElement("p");
   note.className = "rv-note";
   note.textContent =
-    "Every chunk becomes a row of numbers — one slot per word in the library, nearly all of them zero. " +
-    "A word scores high when it is rare everywhere else. Your question becomes a row the same way, and matching is just multiplying the two rows together.";
+    `Each chunk is sent to an embedding model, which returns ${dims} numbers. ` +
+    "Those numbers position the chunk by meaning: two passages that say the same thing in different words end up close together, which is the whole reason retrieval can find something that shares no words with your question.";
   container.appendChild(note);
 
   const fig = document.createElement("div");
   fig.className = "vd-figure";
-  fig.innerHTML = buildVectorDiagram(first, ragvizQueryTerms);
+  fig.innerHTML = buildVectorDiagram(first, dims);
   container.appendChild(fig);
 
   const caveat = document.createElement("p");
   caveat.className = "rv-caveat";
   caveat.textContent =
-    "This is TF-IDF: it counts words, it does not understand them. Ask for “payment terms” and it finds those words — a chunk saying “invoicing schedule” is invisible to it. Swapping in a real embedding model is the main upgrade from here.";
+    `Model: ${data.model || "unknown"}. These numbers are computed once, offline, and stored — that is why the app starts instantly and never re-reads the documents. Only your question gets embedded at the moment you ask it.`;
   container.appendChild(caveat);
-
-  const detail = document.createElement("details");
-  detail.className = "rv-details";
-  const sum = document.createElement("summary");
-  sum.textContent = "Show the actual weights";
-  detail.appendChild(sum);
-  const inner = document.createElement("div");
-  detail.appendChild(inner);
-  container.appendChild(detail);
-  container = inner;
-
-  data.chunks.slice(0, 4).forEach((c, i) => {
-    const row = document.createElement("div");
-    row.className = "rv-vec";
-
-    const label = document.createElement("div");
-    label.className = "rv-vec-label";
-    label.textContent = `Chunk ${i + 1}`;
-    row.appendChild(label);
-
-    const terms = document.createElement("div");
-    terms.className = "rv-vec-terms";
-    const max = Math.max(...c.top_terms.map((t) => t.weight), 0.0001);
-    c.top_terms.forEach((t) => {
-      const term = document.createElement("div");
-      term.className = "rv-term";
-
-      const name = document.createElement("span");
-      name.className = "rv-term-name";
-      name.textContent = t.term;
-
-      const bar = document.createElement("span");
-      bar.className = "rv-term-bar";
-      const fill = document.createElement("span");
-      fill.className = "rv-term-fill";
-      fill.style.width = Math.round((t.weight / max) * 100) + "%";
-      bar.appendChild(fill);
-
-      const val = document.createElement("span");
-      val.className = "rv-term-val";
-      val.textContent = t.weight.toFixed(2);
-
-      term.appendChild(name);
-      term.appendChild(bar);
-      term.appendChild(val);
-      terms.appendChild(term);
-    });
-    row.appendChild(terms);
-    container.appendChild(row);
-  });
 }
 
 function renderRagvizScores(container, data) {

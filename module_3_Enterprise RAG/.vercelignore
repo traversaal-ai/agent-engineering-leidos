@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.env
+search-lab/
+requirements-build.txt
+basic_keyword_semantic_search.py

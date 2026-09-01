@@ -1752,6 +1752,13 @@ button.citation-badge:hover {
   min-width: 520px;
 }
 
+.vd-axis { stroke: var(--border-strong); stroke-width: 1; }
+
+.vd-bar.pos { fill: var(--accent); }
+.vd-bar.neg { fill: var(--violet, #6d5bd0); }
+
+.vd-caption.dim { fill: var(--muted-2); }
+
 .vd-cell {
   stroke: var(--border-strong);
   stroke-width: 1;

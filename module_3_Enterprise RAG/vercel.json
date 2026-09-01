@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/index.py": {
+      "memory": 1769,
+      "maxDuration": 300,
+      "includeFiles": "{data/**,frontend/**,backend/**,Project-Management-2nd-Edition-1729807212.pdf}"
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+}

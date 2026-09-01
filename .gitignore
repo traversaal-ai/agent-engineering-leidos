@@ -19,3 +19,7 @@ venv/
 
 # browser automation scratch output
 .playwright-mcp/
+
+# Built embedding index: regenerate with backend/build_index.py rather than
+# committing one provider's vectors (they are useless to a different provider).
+module_3_Enterprise RAG/index/
