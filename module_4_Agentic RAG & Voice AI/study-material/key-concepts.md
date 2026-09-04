@@ -1,0 +1,25 @@
+# Module 4: Key Concepts (Glossary)
+
+- **Agentic RAG**: Agent-based RAG implementation. Utilizes intelligent agents that can plan, reason, and learn over time; RAG becomes just one tool an agent can decide to use.
+- **Agent Ingredients vs. Full Agents**: A spectrum from simple/lower-cost/lower-latency (Routing, Tool Use, One-Shot Query Planning, Conversation Memory) to advanced/higher-cost/higher-latency (ReAct, Dynamic Planning + Execution).
+- **Routing**: The simplest form of agentic reasoning, uses an LLM to pick the downstream RAG pipeline (e.g. choosing between two RAG query engine tools).
+- **One-Shot Query Planning**: Breaks a query into parallelizable sub-queries, executes each against a RAG pipeline, then synthesizes the sub-responses into a final answer.
+- **Tool Use**: Uses an LLM to call an API and infer that API's parameters; the tool calls the external API/DB, and the agent synthesizes the final response.
+- **Conversation Memory**: A flat list of the conversations the agent had with the user, fetched and updated on every turn of the agent's reasoning loop.
+- **Speech-to-Speech (S2S)**: A one-hop voice architecture: a single model takes audio in and produces audio out natively, sharing the same core transformer as a text LLM but operating on audio tokens.
+- **Cascaded (STT → LLM → TTS)**: A three-hop voice architecture: Speech-to-Text transcribes audio to text, an LLM reasons and responds in text, Text-to-Speech converts the response back to audio. Three independently swappable stages.
+- **STT / ASR**: Speech-to-Text / Automatic Speech Recognition, the transcription stage of a cascaded pipeline.
+- **TTS**: Text-to-Speech, the audio-generation stage of a cascaded pipeline.
+- **Full-duplex**: Audio can flow in both directions (listening and speaking) at the same time, like a real phone call.
+- **VAD (Voice Activity Detection)**: Detects when a person is actually speaking vs. silence/background noise.
+- **Barge-in**: The system detects a user talking while it's still speaking, and stops/flushes its own audio so the user can interrupt naturally.
+- **WebRTC**: Open browser standard for streaming audio/video in real time, low latency, no plugins needed.
+- **SIP (Session Initiation Protocol)**: Signaling protocol that bridges voice agents to real phone numbers and carriers.
+- **S2S trade-off**: Lower latency, native emotion/tone, better barge-in, simpler architecture — vs. weaker voice customization, no transcripts by default, weak tool use, fewer model options, harder to debug.
+- **Cascaded trade-off**: Any/custom voice, best STT accuracy, full transcripts, easy tool calls/guardrails, cheaper at scale, swappable and observable — vs. higher latency, more moving parts, possible context loss between stages, harder natural turn-taking.
+- **Voice stack, four layers**: Transport/Media (WebRTC, WebSocket, SIP), Intelligence (STT→LLM→TTS or S2S), Orchestration (turn-taking, barge-in, VAD, latency budgeting), Reasoning (optional agent framework for memory/workflows/tools).
+- **Model-Agnostic Orchestrators**: Open-source, build-it-yourself frameworks that own timing/integration and let you bring your own models, e.g. LiveKit Agents, Pipecat.
+- **Full-Stack Managed Platforms**: Closed-source, hosted platforms that bundle telephony, orchestration, and models behind one managed API, e.g. ElevenLabs, Vapi.
+- **The Five Pillars of Evaluation**: A pyramid of five levels (LLM Quality + Efficiency, Reasoning, Retrieval, Generation, Agent) grouped into three domains: The LLM Core, The RAG Engine, The Agent Interface.
+- **Level 3, Retrieval Evals**: Measures whether the system finds the right information efficiently: relevance, recall, precision. Benchmarks: BEIR, MS MARCO, Natural Questions. Metrics: NDCG@k, Recall@k, Precision@k, MRR.
+- **Level 4, Generation Evals**: Measures whether the final answer is grounded in the retrieved documents (preventing hallucination). Metrics: Faithfulness, Answer Relevancy, Context Precision, Context Recall, Groundedness, Hallucination Rate, Completeness.
