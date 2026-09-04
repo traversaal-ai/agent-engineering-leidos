@@ -1,7 +1,5 @@
 # Module 4: Agentic RAG & Voice AI
 
-Study material for Week 4, built strictly from the module's own slide deck (`Module-4-Agentic-RAG-&-Voice-AI-Leidos-x-UBLA-x-Traversaal.pptx.pdf`). This folder does not contain a finished app, it contains the reference and study material for the concepts taught in class.
-
 ## Learning objectives
 
 By the end of this module you can:
