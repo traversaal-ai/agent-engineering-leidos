@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{# The workspace: the canvas, and a line to ask a question with.
+
+   Nothing else. Compare, the raw trace and the document overview are their own pages,
+   linked from the top bar — they are cross-run readings rather than parts of a pipeline,
+   and while they were tabs beside the canvas the canvas was one option among four rather
+   than the thing the page is.
+
+   This replaced a stage rail plus a detail pane, which replaced a stacked column of
+   panels. The rail was a list of stage names with the data behind a click; the diagram
+   below draws the data itself, because a class watching from the back of a room cannot
+   click and the point of the screen is that everything is already on it. #}
+
+{% block content %}
+
+{# Swapped wholesale by axis.js as a run advances, and re-rendered by the server on every
+   full page load. One renderer — see `_canvas.html`. #}
+<div id="canvas" class="canvaswrap">
+  {% include "_canvas.html" %}
+</div>
+
+{# The ask bar. One line, pinned to the bottom of the screen — a question is the thing a
+   student is always about to do, and it needs to be reachable rather than prominent. #}
+<form class="askbar" id="ask-form" action="/ask" method="post">
+  {# The indexing track's selection, submitted rather than assumed. With a script the
+     canvas is re-fetched with `?document=` still in the address bar; without one the
+     whole page re-renders, so asking a question would silently move the track back to
+     the last document uploaded. #}
+  {% if selected_document %}
+  <input type="hidden" name="document" value="{{ selected_document }}">
+  {% endif %}
+  <textarea name="question" rows="1"
+            placeholder="Ask something your documents answer&hellip;">{{ question or '' }}</textarea>
+  <button type="submit" id="ask-button" {% if not documents %}disabled{% endif %}>
+    <span class="button__label">Ask</span>
+    <span class="spinner" aria-hidden="true"></span>
+  </button>
+
+  {# The predicted-outcome set, compacted to fit the bar. `preset` plus `formnovalidate`
+     on a submit button, so it runs with scripts disabled and does not trip the
+     textarea's own validation. #}
+  {% if demo_questions and documents %}
+  <div class="askbar__presets">
+    {% for q in demo_questions %}
+    <button type="submit" name="preset" value="{{ q.question | e }}" formnovalidate
+            class="prediction" data-outcome="{{ q.outcome }}"
+            title="{{ q.because | e }}">
+      <span class="prediction__label">{{ q.outcome | replace('_', ' ') }}</span>
+      <span class="prediction__question">{{ q.question | e }}</span>
+    </button>
+    {% endfor %}
+  </div>
+  {% endif %}
+</form>
+
+{% endblock %}

@@ -1,0 +1,26 @@
+-- Drop `graph_index`, left behind by a cancelled feature.
+--
+-- The table held build metrics for a graph retriever (`lightrag`, `agentic_lightrag`)
+-- that was specified across the design docs and never implemented. Nothing in Python
+-- ever read or wrote it — no repository, no model, no query — so it has always been
+-- pure schema. Graph retrieval is a non-goal now (PRD Section 3), so it is not even
+-- schema held in reserve.
+--
+-- **Why this file exists as well as the deletion from `001_initial.sql`.**
+-- `backend/store/db.py::migrate` replays *every* migration on every startup and relies
+-- on `IF NOT EXISTS` to make that harmless — there is no version table. So the two
+-- edits do different jobs:
+--
+--   * removing the DDL from `001` stops the table being recreated on each boot, which
+--     is what leaving it there would have meant: create, then drop, forever;
+--   * this file removes it from databases that already have it, including any dev or
+--     workshop `var/axis.sqlite` carried across the change.
+--
+-- Safe to replay: `IF EXISTS` on both, and the index goes with the table anyway — named
+-- explicitly so the intent survives if someone reorders these statements.
+--
+-- Dropping a table is not something to do lightly, so for the record: it was verified
+-- empty (0 rows) in the development database before this was written, and it is
+-- unreachable from any code path in the repository.
+DROP INDEX IF EXISTS idx_graph_index_session;
+DROP TABLE IF EXISTS graph_index;

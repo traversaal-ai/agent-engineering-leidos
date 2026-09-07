@@ -1,0 +1,353 @@
+{# One stage's real data, at screen size — the body of an expanded card.
+
+   **Rendered here and nowhere else.** `_pipeline.html` and `axis.js` drew the same run
+   from two sides and drifted twice; this carries far more content than those nodes did,
+   so building it a second time in JavaScript would guarantee a third drift — and a drift
+   here means a student is shown different numbers live than on reload, in a tool whose
+   entire claim is that the numbers are real. `axis.js` fetches `/canvas` and swaps it in.
+
+   The frame around this — title, cost, the sibling chips, the narration control — lives
+   in `_card.html`, because a card is a card whether it is open or shut. This file is only
+   the part that differs by stage.
+
+   Expects `step` and optionally `answer`.
+
+   `| e` on everything derived from a document, a model or the web: all three are
+   untrusted input (System Design Section 6.5, priority 4). #}
+
+{% set a = step.attributes or {} %}
+
+<div class="detail">
+
+{# ── PARSE ──────────────────────────────────────────────────────────────
+   The step that makes the file format stop mattering. A PDF, a spreadsheet and a
+   PNG all arrive here and all leave as text with a location attached; nothing
+   downstream knows which it was. #}
+{% if step.step_type == 'parse' %}
+  <p class="detail__lede">
+    <strong>{{ a.get('filename', '') | e }}</strong>
+    &rarr; {{ a.get('blocks', 0) }} block{{ '' if a.get('blocks') == 1 else 's' }}
+    {%- if a.get('block_kinds') %} &middot; {{ a.get('block_kinds') | join(', ') | e }}{% endif %}
+  </p>
+  <ol class="blocks">
+    {% for b in a.get('sample_blocks') or [] %}
+    <li>
+      <div class="blocks__head">
+        <span class="tag">{{ b.get('modality', 'text') | e }}</span>
+        <span class="blocks__where">{{ b.get('location', '') | e }}</span>
+        <span class="blocks__chars">{{ b.get('chars', 0) }} chars</span>
+      </div>
+      <p class="blocks__text">{{ b.get('preview', '') | e }}</p>
+    </li>
+    {% endfor %}
+  </ol>
+  {% if a.get('blocks', 0) > (a.get('sample_blocks') or []) | length %}
+  <p class="muted">
+    Showing {{ (a.get('sample_blocks') or []) | length }} of {{ a.get('blocks') }}.
+  </p>
+  {% endif %}
+
+{# ── CHUNK ──────────────────────────────────────────────────────────────
+   The pane with the most to teach, and the reason the shared text is highlighted
+   rather than described: the notebook explains overlap in a sentence, and a
+   student who reads that sentence has learned a sentence. Seeing the same 150
+   characters end one chunk and begin the next is what makes it obvious why a fact
+   straddling a boundary would otherwise be unretrievable. #}
+{% elif step.step_type == 'chunk' %}
+  <p class="detail__lede">
+    {{ a.get('chunk_count', 0) }} chunk{{ '' if a.get('chunk_count') == 1 else 's' }}
+    &middot; up to {{ a.get('max_chars', 0) }} characters
+    &middot; {{ a.get('overlap_chars', 0) }} of overlap
+  </p>
+  {# A pager: one chunk visible, the rest one click away, no scrolling and no
+     JavaScript. Radios because that is the only control that can hold a selection
+     with scripts disabled — styled as a pager rather than as a row of switches,
+     since what it does is page, not configure. #}
+  <div class="chunkview">
+    <div class="chunkview__pager">
+      <span class="chunkview__pagerlabel">chunk</span>
+      {% for c in a.get('chunks') or [] %}
+      <input type="radio" name="chunkpick" id="chunk-{{ step.id }}-{{ c.get('index') }}"
+             {% if loop.first %}checked{% endif %}>
+      <label for="chunk-{{ step.id }}-{{ c.get('index') }}">{{ c.get('index') }}</label>
+      {% endfor %}
+      <span class="chunkview__pagerlabel">of {{ a.get('chunk_count', 0) }}</span>
+    </div>
+    <ol class="chunkview__list">
+      {% for c in a.get('chunks') or [] %}
+      <li class="chunkview__item">
+        <div class="chunkview__meta">
+          <span class="tag">chunk {{ c.get('index') }}</span>
+          <span class="blocks__where">{{ c.get('location', '') | e }}</span>
+          <span class="blocks__chars">{{ c.get('chars', 0) }} chars</span>
+        </div>
+        <p class="chunkview__text">
+          {%- set shared = c.get('overlap_with_previous') or '' -%}
+          {%- if shared -%}
+          {# The repeated head, marked. Split rather than styled with a regex so
+             the exact span comes from the chunker (`_overlap`), not from the
+             renderer guessing at it. #}
+          <mark class="overlap">{{ shared | e }}</mark>{{ c.get('text', '')[shared | length:] | e }}
+          {%- else -%}
+          {{ c.get('text', '') | e }}
+          {%- endif -%}
+          {%- if c.get('truncated') %}<span class="muted"> &hellip;</span>{% endif -%}
+        </p>
+        <p class="chunkview__note">
+          {% if c.get('overlap_with_previous') %}
+          The highlighted {{ c.get('overlap_with_previous') | length }} characters
+          also end chunk {{ c.get('index') - 1 }} &mdash; that repetition is what
+          stops a fact being lost at the boundary.
+          {% elif c.get('index') == 1 %}
+          The first chunk, so nothing precedes it to overlap with.
+          {% else %}
+          No overlap: this chunk starts a new block, and blocks are never merged so
+          a citation can name one location.
+          {% endif %}
+        </p>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+
+{# ── EMBED ──────────────────────────────────────────────────────────────
+   Both phases render here, and that is deliberate: indexing a chunk and embedding
+   a question are the same model producing vectors of the same width into the same
+   space, which is precisely why comparing them means anything. Two panes would
+   have hidden the one fact that makes retrieval work. #}
+{% elif step.step_type == 'embed' %}
+  <p class="detail__lede">
+    {{ a.get('model', '') | e }}
+    &middot; {{ a.get('dimensions', 0) }} dimensions
+    {%- if a.get('purpose') == 'query' %} &middot; the question{% else %} &middot; {{ a.get('chunks', 0) }} chunk{{ '' if a.get('chunks') == 1 else 's' }}{% endif %}
+  </p>
+  {% for s in a.get('samples') or [] %}
+  {% include "_vector.html" %}
+  {% endfor %}
+
+{# ── STORE ──────────────────────────────────────────────────────────────  #}
+{% elif step.step_type == 'store' %}
+  <p class="detail__lede">
+    {{ a.get('written', 0) }} vector{{ '' if a.get('written') == 1 else 's' }} written
+    &middot; the index now holds {{ a.get('total_in_index', 0) }}
+  </p>
+  <p class="detail__prose">
+    Each vector is filed next to its chunk, so a later search returns text rather
+    than numbers. Nothing is compared yet &mdash; the index is only a place to put
+    them. That comparison is the next phase, and it does not happen until somebody
+    asks a question.
+  </p>
+
+{# ── ROUTE ──────────────────────────────────────────────────────────────
+   The only stage that makes a *decision* rather than a transformation, which is
+   what the whole orchestration axis comes down to. Its reason is the model's own
+   words, so it is escaped like any other untrusted text. #}
+{# ── REWRITE ────────────────────────────────────────────────────────────
+   Both texts in full, and the turns the resolution was made against. The card can
+   only afford eighty characters of each; this is where a student reads what "it"
+   turned into and checks the rewriter did not quietly narrow the question. #}
+{% elif step.step_type == 'rewrite' %}
+  <p class="detail__lede">
+    {%- if a.get('changed') %}
+    resolved before searching
+    {%- elif a.get('llm_called') is false %}
+    rewriting is turned off
+    {%- elif a.get('implausible') %}
+    the rewrite was discarded
+    {%- else %}
+    nothing needed changing
+    {%- endif -%}
+    {% if a.get('history_turns') %}
+    &middot; {{ a.get('history_turns') }} earlier turn{{ '' if a.get('history_turns') == 1 else 's' }} in view
+    {% endif %}
+  </p>
+  {% if a.get('reason') %}
+  <p class="detail__quote">{{ a.get('reason') | e }}</p>
+  {% endif %}
+  <dl class="pairs">
+    <dt>as typed</dt>
+    <dd>{{ (a.get('original') or '') | e }}</dd>
+    <dt>searched for</dt>
+    <dd>{{ (a.get('rewritten') or a.get('original') or '') | e }}</dd>
+  </dl>
+  <p class="detail__prose">
+    This is the only stage that can repair a follow-up. &ldquo;How long is it?&rdquo;
+    does not retrieve badly &mdash; it retrieves <em>nothing</em>, because every word
+    in it is common and the thing it refers to is in the previous turn. No rephrasing
+    of those four words recovers what &ldquo;it&rdquo; was; only the conversation does.
+    {% if a.get('implausible') %}
+    This rewrite was thrown away: it shared no content word with the question, so it
+    was not a rewrite of it. The question as typed was searched for instead &mdash;
+    a bad rewrite is worse than none, because everything after this stage would then
+    be working on text nobody asked.
+    {% endif %}
+    Naive RAG has no card here, which is why a follow-up asked of it is answered as
+    though the conversation never happened.
+  </p>
+
+{% elif step.step_type == 'route' %}
+  <p class="detail__lede">
+    look in <strong>{{ a.get('source', 'documents') | e }}</strong>
+    &middot; {{ 'split the question' if a.get('needs_decomposition') else 'one lookup is enough' }}
+    &middot; {{ 'a lookup depends on an earlier one' if a.get('multi_hop') else 'no chained lookup' }}
+    &middot; confidence {{ '%.2f' | format(a.get('confidence', 0)) }}
+  </p>
+  {% if a.get('reason') %}
+  <p class="detail__quote">{{ a.get('reason') | e }}</p>
+  {% endif %}
+  <p class="detail__prose">
+    Naive RAG has no card here at all: it always searches the documents and always
+    treats the question as one lookup. Everything the agentic strategy costs extra
+    starts with this decision, which is why it is worth reading rather than counting.
+    {% if a.get('multi_hop') %}
+    <strong>Multi-hop</strong> is the third decision, and the one to watch: it says
+    the second thing to search for is not named in the question at all, only in the
+    answer to the first search. Splitting cannot help with that &mdash; a decomposer
+    can only divide what it can already see &mdash; so the loop below runs on a
+    search that <em>succeeded</em>, and the model writes the next query from what
+    came back.
+    {% endif %}
+    {% if a.get('fallback_taken') %}
+    This one fell back to the default &mdash; the model's answer could not be parsed,
+    and guessing would be worse than a stated default.
+    {% endif %}
+  </p>
+
+{# ── DECOMPOSE ──────────────────────────────────────────────────────────
+   The sub-questions, listed. The most interesting artefact an agentic run
+   produces, and the reason the old canvas fanned its retrievals out into a branch
+   per sub-question. `sub_questions_text` carries the *parsed* list —
+   `agents/decomposer.py` records it precisely so nothing downstream has to
+   re-implement the parser and drift from it. #}
+{% elif step.step_type == 'decompose' %}
+  {% set subs = a.get('sub_questions_text') or [] %}
+  <p class="detail__lede">
+    {{ a.get('sub_questions', 1) }} sub-question{{ '' if a.get('sub_questions', 1) == 1 else 's' }}
+    {%- if a.get('llm_called') is false %} &middot; not split &mdash; {{ a.get('reason', '') | e }}{% endif %}
+  </p>
+  <ol class="subquestions">
+    {% for sub in subs %}
+    <li>{{ sub | e }}</li>
+    {% endfor %}
+  </ol>
+  {% if subs | length > 1 %}
+  <p class="detail__prose">
+    Each of these is searched for separately, so a question whose halves live in
+    different documents can find both. That is the whole of what decomposition
+    buys, and it is why the agentic run costs more than the naive one.
+  </p>
+  {% endif %}
+
+{# ── RETRIEVE ───────────────────────────────────────────────────────────
+   The single most explanatory pane. Retrieval used to render as "3 passages ·
+   best 0.81", which states an outcome and hides the mechanism: nothing said that
+   twenty passages were scored and a line was drawn. #}
+{% elif step.step_type == 'retrieve' %}
+  <p class="detail__lede">
+    The question became a vector, then every passage was scored against it.
+  </p>
+
+  {# Side by side rather than stacked. The candidate list is what anyone opens this
+     card for, and a full-width vector figure above it pushed the list off the bottom
+     of a 720px screen — so the pane spends the width it has, of which there is
+     plenty, rather than the height it has not. #}
+  <div class="detail__cols">
+  {% set qv = a.get('query_vector') or {} %}
+  <div>
+    {% if qv %}
+    {% set s = qv %}
+    {% include "_vector.html" %}
+    {% endif %}
+  </div>
+
+  {% set candidates = a.get('candidates') or [] %}
+  <div>
+  {% if candidates %}
+  <ol class="scores">
+    {% set threshold = a.get('threshold', 0) %}
+    {% set ns = namespace(drawn=false) %}
+    {% for c in candidates %}
+    {% if not c.get('kept') and not ns.drawn %}
+    {% set ns.drawn = true %}
+    <li class="scores__line" aria-hidden="true">
+      <span>threshold {{ '%.2f' | format(threshold) }}</span>
+    </li>
+    {% endif %}
+    <li class="scores__item" data-kept="{{ 'yes' if c.get('kept') else 'no' }}">
+      <span class="scores__score">{{ '%.3f' | format(c.get('score', 0)) }}</span>
+      {# The bar is the score. A number is exact and a length is instant, and in a
+         room the length is what carries. #}
+      <span class="scores__bar" style="--score: {{ '%.3f' | format(c.get('score', 0)) }}"></span>
+      <span class="scores__where">{{ c.get('location', '') | e }}</span>
+      <span class="scores__text">{{ c.get('preview', '') | e }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="detail__prose">
+    {{ a.get('chunks_found', 0) }} passage{{ '' if a.get('chunks_found') == 1 else 's' }}
+    cleared {{ '%.2f' | format(a.get('threshold', 0)) }} and went to the model.
+    The rest were scored and dropped &mdash; not missing, just not close enough.
+    Nothing below the line reaches the answer, which is why Axis can say it found
+    nothing instead of guessing.
+  </p>
+  {% endif %}
+  </div>
+  </div>
+
+{# ── AUGMENT ────────────────────────────────────────────────────────────
+   The moment "retrieval-augmented" means something, and previously the one gap a
+   student had to take on trust: passages went in, an answer came out, and the
+   substitution happened out of sight. #}
+{% elif step.step_type == 'augment' %}
+  <p class="detail__lede">
+    {{ a.get('passages', 0) }} passage{{ '' if a.get('passages') == 1 else 's' }}
+    and the question &rarr; {{ a.get('prompt_chars', 0) }} characters of prompt
+  </p>
+  <div class="detail__cols detail__cols--even">
+    <div class="prompt">
+      <p class="prompt__label">The rules the model is given</p>
+      <pre class="prompt__text">{{ a.get('system_prompt', '') | e }}</pre>
+    </div>
+    <div class="prompt">
+      <p class="prompt__label">The context and the question</p>
+      <pre class="prompt__text">{{ step.raw_input | e }}</pre>
+    </div>
+  </div>
+  <p class="detail__prose">
+    This is the entire input. The model has no access to your documents &mdash; it
+    only ever sees this text, which is why an answer can cite a passage number and
+    why it is told to say <code>NO_RELEVANT_CONTENT</code> rather than fall back on
+    what it happens to know.
+  </p>
+
+{# ── SYNTHESIZE / GENERATE ──────────────────────────────────────────────  #}
+{% elif step.step_type in ('synthesize', 'generate') %}
+  <p class="detail__lede">
+    {{ step.prompt_tokens }} tokens in &rarr; {{ step.completion_tokens }} out
+    {%- if a.get('citations') is not none %} &middot; {{ a.get('citations') }} citation{{ '' if a.get('citations') == 1 else 's' }}{% endif %}
+  </p>
+  {% if answer %}
+  {% include "_answer.html" %}
+  {% else %}
+  <pre class="prompt__text">{{ step.raw_output | e }}</pre>
+  {% endif %}
+
+{# ── Everything else ────────────────────────────────────────────────────
+   A tool call, a ReAct iteration, a web search: the raw text behind them rather
+   than a second rendering of a summary the card already carries. #}
+{% else %}
+  {% if step.raw_input %}
+  <div class="prompt">
+    <p class="prompt__label">Input</p>
+    <pre class="prompt__text">{{ step.raw_input | e }}</pre>
+  </div>
+  {% endif %}
+  {% if step.raw_output %}
+  <div class="prompt">
+    <p class="prompt__label">Output</p>
+    <pre class="prompt__text">{{ step.raw_output | e }}</pre>
+  </div>
+  {% endif %}
+{% endif %}
+
+</div>

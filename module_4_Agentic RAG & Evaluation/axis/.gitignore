@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Secrets. Only .env.example is committed.
+.env
+.env.*
+!.env.example
+
+# Runtime state — regenerated, never shared.
+var/
+*.sqlite
+*.sqlite3
+.chroma/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/

@@ -1,0 +1,76 @@
+{# One answer, with its citations and metrics.
+
+   Cost and latency sit beside the answer, not behind a details toggle. The whole
+   premise of Axis is that "agentic RAG costs more" should be *felt* rather than
+   read, and a number a student has to go looking for is a number they will not
+   compare.
+
+   `| e` on everything: the answer is LLM output derived from uploaded documents,
+   which is untrusted input (System Design Section 6.5, priority 4). #}
+
+<article class="answer answer--{{ 'grounded' if answer.grounded else 'ungrounded' }}">
+  <header class="answer__head">
+    <span class="chip {{ 'chip--on' if answer.grounded else '' }}">
+      {{ answer.strategy | e }}
+    </span>
+    <span class="answer__metrics">
+      {{ answer.latency_ms }} ms &middot;
+      ${{ '%.5f' | format(answer.cost_usd) }} &middot;
+      {{ answer.prompt_tokens }}&rarr;{{ answer.completion_tokens }} tok
+    </span>
+  </header>
+
+  <div class="answer__text">{{ answer.answer | e }}</div>
+
+  {# PRD Section 6: web citations must be visually distinguishable from document
+     ones, "so a student can never mistake 'my documents said this' for 'a search
+     result said this'". Before the web route that was guaranteed by construction —
+     there was only one kind — so this markup is now the guarantee.
+
+     Three signals, not one, because any single one can be missed: the word "web"
+     spelled out, a `data-kind` hook the stylesheet colours differently, and the URL
+     rendered as the source location. A colour alone would fail on a projector and
+     for a colour-blind reader; a badge alone reads as decoration.
+
+     The URL is *text*, never an `<a href>`. Axis never fetches a result URL (System
+     Design Section 6.5) and a link inviting the student to click a search result
+     from inside the trace is the same class of thing one step removed. They can copy
+     it if they want to check. #}
+  {% if answer.citations %}
+  <ol class="citations">
+    {% for citation in answer.citations %}
+    <li data-kind="{{ citation.kind | default('document') }}">
+      <div class="citations__head">
+        <span class="citations__n">[{{ loop.index }}]</span>
+        {% if citation.kind == 'web' %}
+        <span class="citations__kind">web</span>
+        {% endif %}
+        <span class="citations__file">{{ citation.filename | e }}</span>
+        {% if citation.source_location %}
+        <span class="citations__where">{{ citation.source_location | e }}</span>
+        {% endif %}
+      </div>
+      {% if citation.quote %}
+      <blockquote>{{ citation.quote | e }}</blockquote>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% if answer.citations | selectattr('kind', 'equalto', 'web') | list %}
+  <p class="answer__note answer__note--web">
+    Some of this answer came from a live web search, not from your documents.
+    Web snippets are untrusted third-party text &mdash; check the sources before
+    relying on them.
+  </p>
+  {% endif %}
+  {% else %}
+  {# Not an error state. PRD Section 6 requires that when nothing relevant is
+     found the answer says so rather than inventing a source — so an answer with
+     no citations is the system working, and the UI should say that plainly
+     rather than looking broken. #}
+  <p class="answer__note">
+    No citations, because nothing in your documents supported an answer. The
+    trace below shows what was searched and how close it came.
+  </p>
+  {% endif %}
+</article>

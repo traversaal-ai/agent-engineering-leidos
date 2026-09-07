@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+{% block title %}Why agentic &middot; Axis{% endblock %}
+
+{# The four ways naive RAG fails, each demonstrated on the same documents.
+
+   **The page the platform was missing.** Axis could always show what orchestration
+   *costs* — the router, the decomposition, the extra retrievals, priced per step.
+   It could never show the shape of the problem orchestration solves, so a student
+   learned a price without learning what they were buying, and the obvious first
+   question to type is a single-fact lookup where the honest answer is "agentic was
+   a waste of money".
+
+   The course material this cohort already read names four specific failures and
+   hands one of them forward by name — *"is there one pain point that this
+   architecture only partially fixes, one that would still benefit from an agent
+   actively deciding to retrieve again based on what it just found?"* This page is
+   the answer to that question.
+
+   **Each is answered by a different mechanism, and that is the lesson.** Not
+   "agentic is better": a comparison needs decomposition, an inferential question
+   needs a second retrieval informed by the first, an overview needs to read
+   everything, and a follow-up needs its references resolved. Four failures, four
+   fixes, and knowing which is which is the difference between a student who can
+   choose and one who can only switch everything on.
+
+   Every `measured` sentence is the harness's, not the page's. `--compare-strategies`
+   fails if the mechanism a card claims stops improving its question. #}
+
+{% block content %}
+{# `page--fit` opts this page out of `.page`'s own scroll and moves it into the open
+   card's own detail, so the four cards never leave the screen. See app.css. #}
+<div class="page page--wide page--fit">
+  {# **Title and mode on one line.** The two amber statements below used to be full-width
+     banners, and between them and a three-line lede the page spent ~306px before the
+     first card — on a page whose entire promise is that four cards are on screen at
+     once. As chips they cost ~24px and say the same thing.
+
+     `page__head--inline` rather than two elements, so a state with both chips still
+     wraps rather than stacking two blocks. #}
+  <header class="page__head page__head--inline">
+    <h1 class="page__title">Why agentic</h1>
+
+    {% if pain_points and not verified %}
+    {# **The page has two modes and says which one it is in.**
+
+       The symptom and the mechanism are facts about retrieval, not about ACME, so they
+       hold whatever is indexed. The *measurement* does not: every "measured" sentence is
+       the harness's figure for a specific golden question against a specific set of
+       documents, and there is no golden answer for a question typed thirty seconds ago.
+
+       **This chip and the open card's amber box carry the rule between them** — every
+       claim verified, or visibly marked as not verified, with no third state. Two
+       elements rather than one, and that is the right split: `verified` is a property of
+       the active corpus, identical for all four cards, so this states it once for the
+       page and the box states it in full for the card being read. Shrinking this to a
+       chip does not weaken the rule, because the box is where the sentence lives and the
+       box is untouched — and nothing renders `point.measured` outside the verified
+       branch.
+
+       The full sentence stays in the DOM: `title=` for a pointer and a
+       `visually-hidden` span for a screen reader, so shrinking the visual does not
+       shrink what is said. #}
+    <span class="chip chip--warn"
+          title="You are searching your own documents, so you supply the question and no card claims a number. Switch the rail to Demo corpus for the measured versions.">
+      Unverified mode
+      <span class="visually-hidden">
+        &mdash; you are searching your own documents, so you supply the question and no
+        card claims a number. Switch the rail to Demo corpus for the measured versions.
+      </span>
+    </span>
+    {% endif %}
+
+    {% if not runnable %}
+    <span class="chip chip--warn">
+      Nothing is indexed in this corpus
+      {# The remedy stays a real link rather than going into a `title`: it is the one
+         thing a reader in this state needs to act on. #}
+      &mdash; <a href="/">upload one</a>
+    </span>
+    {% endif %}
+
+    {# One line. The dropped sentence said the point is which failure needs which fix,
+       which the row of four now says by being a row of four. #}
+    <p class="page__lede">
+      Four ways plain retrieval fails, and the different mechanism that answers each.
+    </p>
+  </header>
+
+  {# No flash banner here: `base.html` renders one above `{% block content %}` from the
+     same context key, and two copies of the same message cost ~65px in the tightest
+     layout in the product. #}
+
+  {% if not pain_points %}
+  <p class="documents__empty">
+    No demonstration is available. The pain points are derived from the golden
+    question set, so this is empty only if that set has lost the questions they were
+    measured on &mdash; which
+    <code>python -m ai_backend.evaluation --compare-strategies</code> reports as a
+    failure rather than a gap.
+  </p>
+  {% else %}
+
+  {# The four failures at once, each with the mechanism that answers it, and the one you
+     clicked expanded **in place**.
+
+     **That pairing is the lesson, so it is on the card face and not behind the click.**
+     CLAUDE.md records why, about the canvas: a rail of names with the data behind a
+     click "taught nothing, because a class watching from the back of a room cannot
+     click". What moves behind the click here is the *run* — a question, a button and two
+     answers — which is an interaction rather than a lesson and cannot be on screen four
+     times over anyway.
+
+     **The detail used to be a section below this row, and that was the defect.** Behind a
+     border and a margin it read as a different part of the page, and reaching it meant
+     scrolling — which defeats a row whose whole purpose is that the four stay on screen.
+     It now lives inside the card it describes; the card widens and the other three
+     narrow. Same rule as the canvas: *"an opened card grows within its own track and
+     never takes the board."*
+
+     `data-open` on the list, and on the open `<li>`, is written here rather than derived
+     with `:has()`. The codebase uses `:has()` where a state must change without a server
+     round trip — `body:has(input:checked)` for the strategy radios — and this selection
+     *is* a round trip, so the server stays the only renderer. #}
+  <ol class="painpoints" {% if selected_point %}data-open="true"{% endif %}>
+    {% for point in pain_points %}
+    {% set ran = results.get('point_id') == point.id %}
+    {% set on = point.id == selected_point %}
+    <li class="painpointslot" id="{{ point.id }}" {% if on %}data-open="true"{% endif %}>
+      {# An `<article>`, not an `<a>`. The card holds a form when it is open, and a form
+         cannot live inside an anchor — so the card is a container and the link is an
+         overlay, exactly as `_card.html` does it on the canvas and for the same reason
+         it records there: an invisible overlay across a form swallows the form.
+
+         `aria-current` rather than a modifier class, following `.tracerun` — the state is
+         "this is the one open", which is what the attribute means.
+
+         `data-busy-group` sits on the open card, with the form. Only one form is on the
+         page, so `peers()` would behave identically without it — but the attribute exists
+         to stop the *document* becoming the group and sweeping in the rail's own busy
+         forms, and that invariant is cheap to keep. #}
+      <article class="painpoint"
+               {% if on %}aria-current="true" data-busy-group{% endif %}
+               {% if ran %}data-ran="true"{% endif %}>
+        <p class="painpoint__index">
+          <span class="painpoint__n">{{ loop.index }}</span>
+          {# The short name, so the four can be scanned from the back of a room and an
+             instructor can say "we are on the third one". Not the material's own bolded
+             phrase — see `_TITLES` in `ai_backend/evaluation/demo.py` for why, and for
+             what carries the material's wording instead (the symptom, below). #}
+          <span class="painpoint__title">{{ point.title }}</span>
+          {# Which card holds the result, and nothing else.
+             There is deliberately no `measured` / `not measured` chip here: `verified`
+             is a property of the *page* — the active corpus — not of a card, so four
+             chips would be the header's chip printed four more times, and two tests that
+             mean to check the open card's box would pass on the chips alone. #}
+          {% if ran %}<span class="painpoint__state">ran</span>{% endif %}
+          {% if on %}
+          {# Back to four closed cards. A real link, so it works with scripts disabled —
+             following `.card__close` on the canvas. #}
+          <a class="painpoint__close" href="/why-agentic" title="Close this one">&times;</a>
+          {% endif %}
+        </p>
+
+        {# The material's own words. Quoted rather than paraphrased so a student who
+           read them last week recognises the sentence and knows this is the same
+           subject rather than a new one. #}
+        <p class="painpoint__symptom">{{ point.symptom }}</p>
+
+        {# **All three are on every card face when the page opens**, which is what PRD §6
+           asks for: each failure "named in the same words the course material uses,
+           beside the mechanism that answers it *and a question that exhibits it*". On
+           load nothing is open, so all four carry all three. Once a card *is* open the
+           other three drop these two to their heading and symptom — see `.painpoints
+           [data-open]` in app.css — because 153px of column cannot hold five fields, and
+           the criterion is about the state on opening the page. #}
+        <p class="painpoint__mechanism">
+          <span class="eyebrow eyebrow--accent">What answers it</span>
+          {{ point.mechanism }}
+        </p>
+
+        {# Clamped to two lines — it is here to show the shape of a question that triggers
+           this failure, and the open card carries it in full.
+
+           In unverified mode it is what the student's own box is placeholdered with, so
+           it reads as the example it is rather than as a claim about their documents. #}
+        <p class="painpoint__example">
+          <span class="eyebrow">{{ 'Asks' if verified else 'For example' }}</span>
+          {{ point.question }}
+        </p>
+
+        {% if not on %}
+        {# The overlay link, present only while the card is closed. A pseudo-element-style
+           overlay rather than wrapping the card, because the face has its own structure
+           and nesting all of it inside a link reads terribly aloud — and because an open
+           card holds a text field and a submit button that an overlay would swallow.
+           Both halves of that reasoning are `_card.html`'s. #}
+        <a class="painpoint__open" href="/why-agentic?point={{ point.id }}#{{ point.id }}">
+          <span class="visually-hidden">Open {{ point.title }}</span>
+        </a>
+        {% else %}
+
+        {# Inside the card, and it scrolls on its own so a run's two answers never push
+           the four cards off the screen — the whole point of the row. #}
+        <div class="painpoint__detail">
+
+    {# **Three states, and they are three because they mean three different things.**
+
+       `verified` is about the *corpus*: on your own documents nobody measured the
+       question you typed. `point.verified_by_harness` is about the *mechanism*: the
+       evaluation harness records what each one buys, and it may have never run here,
+       run under other settings, or run and found the mechanism no longer pays off on
+       this corpus.
+
+       Collapsing them into one "not measured" would be its own dishonesty — the causes
+       differ and so do the remedies, and a student who cannot tell them apart learns the
+       wrong thing about which claims rest on what. #}
+    {% if verified and point.verified_by_harness %}
+    <p class="painpoint__measured">
+      <span class="eyebrow">Measured</span>
+      {{ point.measured }}
+    </p>
+    {% elif verified %}
+    {# The measured corpus, but no measurement of this mechanism to report. The symptom,
+       the mechanism and the question stay on the card face in this state: those are facts
+       about how retrieval behaves and hold regardless. Only the figure is in question,
+       and `point.measured` is empty here rather than stale — which is the whole repair.
+       A sentence that outlived a failing gate is how two cards came to claim "asked
+       whole, this retrieves neither document" against a measured 1.00. #}
+    <p class="painpoint__measured painpoint__measured--unverified">
+      <span class="eyebrow">Not currently demonstrable</span>
+      {{ point.unverified_reason }}
+      The run below still happens and still reports what it cost; what is missing is a
+      figure saying this mechanism earns it.
+    </p>
+    {% else %}
+    {# The replacement for the number, not the absence of one. A card that simply
+       dropped its "Measured" line would read as a card that happened to have no
+       figure, which is indistinguishable from a figure nobody bothered to write —
+       and the difference between those two is the whole honesty of this page.
+
+       **This box now covers the open card only**, where it used to appear on all four,
+       so the rule has to be read across two elements rather than one: the banner above
+       the row states the mode for the page, and this states it for the card you are
+       reading. That is enough because `verified` *is* page-level — it is the active
+       corpus, identical for all four — so a per-card chip would be the banner repeated,
+       and repeating it four times is not more honest, only louder. What must never
+       happen is a card showing a measured figure while the page is unverified, and
+       nothing renders `point.measured` outside the branch above. #}
+    <p class="painpoint__measured painpoint__measured--unverified">
+      <span class="eyebrow">Not measured</span>
+      Nothing measured this one. You choose the question, so the shape of the failure
+      is demonstrated and the number is not claimed &mdash; what the result reports
+      below is read from the two traces, and whether the mechanism actually fired is
+      read from them too.
+    </p>
+    {% endif %}
+
+    <div class="painpoint__ask">
+      {% if verified %}
+      {% if point.context_question %}
+      {# The one demonstration that is two turns. Both are shown, because the
+         follow-up is meaningless on its own — which is the entire point of it. #}
+      <p class="painpoint__turn"><span>first</span> {{ point.context_question }}</p>
+      <p class="painpoint__turn"><span>then</span> {{ point.question }}</p>
+      {% else %}
+      <p class="painpoint__turn">{{ point.question }}</p>
+      {% endif %}
+      {% endif %}
+
+      {# A plain form post. Works with JavaScript disabled, which is a hard
+         requirement — and the honest choice for a control that spends money.
+
+         In verified mode it carries no question field at all: the golden one is used
+         server-side, so the card's measured figure describes the run on screen and
+         cannot be edited out from under it. #}
+      <form action="/why-agentic/{{ point.id }}" method="post" class="painpoint__form"
+            data-busy-label="Running both">
+        {% if not verified %}
+        {# The student's own question. Exercise 3 of the course material — *diagnose
+           the naive RAG failure* — is exactly this, and the page becomes the place to
+           do it: it is entirely possible to type a question that is not a comparison,
+           and the result will then honestly report that the decomposer did not split
+           it. That is the exercise working, not the page failing. #}
+        {% if point.context_question %}
+        <label class="painpoint__field">
+          <span>first, ask</span>
+          <input type="text" name="context_question" required
+                 placeholder="{{ point.context_question | e }}"
+                 {% if not runnable %}disabled{% endif %}>
+        </label>
+        <label class="painpoint__field">
+          <span>then, a follow-up referring back to it</span>
+          <input type="text" name="question" required
+                 placeholder="{{ point.question | e }}"
+                 {% if not runnable %}disabled{% endif %}>
+        </label>
+        {% else %}
+        <label class="painpoint__field">
+          <span>your question</span>
+          <input type="text" name="question" required
+                 placeholder="{{ point.question | e }}"
+                 {% if not runnable %}disabled{% endif %}>
+        </label>
+        {% endif %}
+        {% endif %}
+        {# The label and the spinner are separate spans because `axis.js` swaps the
+           first and reveals the second on submit. This form posts *natively* — the
+           page navigates — so unlike Ask and Upload there is no fetch to await: the
+           busy state is set and then torn down by the new document arriving.
+
+           It is the longest-running control in the product. Two strategies, and the
+           memory card is two turns each, so a run is up to four model round trips
+           against a real provider. With nothing on screen the only available reading
+           was that the click had not registered — the same failure the upload button
+           had, in the one place where it costs twice as much to retry. #}
+        <button type="submit" class="button--small"
+                {% if not runnable %}disabled{% endif %}>
+          <span class="button__label">Run both strategies</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+      </form>
+    </div>
+
+    {% if point.id == 'summarize' %}
+    {# **This one's fix is not a strategy, and the card has to say so.**
+
+       The other three are answered by something the agentic *pipeline* does, so
+       running both strategies shows the difference. Summarization is answered by
+       reading everything, which is a different mode entirely — it sits on neither
+       axis and is deliberately not in the `Strategy` enum. Running both strategies
+       here shows two retrieval-shaped answers to a question that is not
+       retrieval-shaped, which is the pain point rather than the fix.
+
+       So the card offers both: the pair, to see the failure, and the page where
+       the fix lives. #}
+    <p class="painpoint__aside">
+      The fix here is a <em>mode</em>, not a strategy: both columns below retrieve,
+      and retrieving is the problem. <a href="/summarize">Summarize</a> reads every
+      chunk of every document you pick &mdash; ask it the same thing and compare
+      what comes back, and watch the cost move with the number of documents rather
+      than with the question.
+    </p>
+    {% endif %}
+
+    {% if ran %}
+    {% include "_painpoint_result.html" %}
+    {% endif %}
+
+    {# Moved down here from the foot of the page, because it explains the measured line
+       it now sits beside — and because a page that no longer scrolls cannot spend five
+       lines on a footnote above the fold. #}
+    <p class="painpoint__foot">
+      {% if verified %}
+      Nothing on this page is asserted. Each claim is bound to a question in the golden
+      set, and <code>python -m ai_backend.evaluation --compare-strategies</code> exits
+      non-zero if the mechanism it names stops improving that question &mdash; so a
+      corpus change that invalidates a demonstration fails a build rather than
+      quietly leaving a teaching tool promising an outcome nothing measured.
+      {% else %}
+      The symptoms and the mechanisms above are still the measured ones &mdash; each is
+      bound to a question in the golden set, and
+      <code>python -m ai_backend.evaluation --compare-strategies</code> exits non-zero if
+      the mechanism it names stops improving that question. What is not measured here is
+      <em>your</em> question, because nothing has a ground truth for it. Every figure a
+      result reports above is read from the two traces of the run you just watched, which
+      is a different and weaker kind of evidence, and the cards say so.
+      {% endif %}
+    </p>
+        </div>
+        {% endif %}
+      </article>
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</div>
+{% endblock %}

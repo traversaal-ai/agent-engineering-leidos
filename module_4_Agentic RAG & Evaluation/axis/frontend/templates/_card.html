@@ -1,0 +1,131 @@
+{# One card on the canvas: a stage, its state, and what it produced.
+
+   Three states of content, and the order matters:
+
+   - **Not yet run, or running** — the sentence saying what this stage is for
+     (`STAGE_WHY`). A fresh canvas is therefore not blank, it is the shape of RAG
+     explained, before anything has been spent; and a stage caught mid-flight says what
+     it is doing rather than showing a miniature of data that does not exist yet.
+   - **Run** — the miniature, drawn from its own real attributes (`_card_art.html`). No
+     click required, which is the entire reason this file exists.
+   - **Expanded** — the full pane, this stage's data at screen size.
+
+   Expects `stage` (from `stages_for`), `step` (the step that ran it, or none) and
+   `expanded`. When expanded, also `siblings`, `sibling_label` and `answer`. #}
+
+{# `running` is read off the step, not guessed. It used to be inferred by axis.js —
+   mark the next pending card and hope — because a step only reached the store once it
+   had finished. It is now written on entry as well, so this is a measurement. #}
+{% set running = step and step.status == 'running' %}
+
+{# Every link out of a card keeps the indexing track's selection. Without this, opening
+   any card — or closing one — would drop `?document=` and move the track back to the
+   last document uploaded, on the scripts-disabled path silently. #}
+{# A literal `&`, not `&amp;` — Jinja autoescapes this on output, and writing the entity
+   here produced `&amp;amp;document=`, which a browser reads as a parameter named
+   `amp;document`. The selection was silently dropped by every card link. #}
+{% set keep = ('&document=' ~ selected_document) if selected_document else '' %}
+{% set keep_only = ('?document=' ~ selected_document) if selected_document else '' %}
+
+<li class="cardslot"
+    data-stage="{{ stage.type }}"
+    {% if stage.agentic_only %}data-agentic="true"{% endif %}>
+
+  <article class="card"
+           data-type="{{ stage.type }}"
+           data-state="{{ 'running' if running else ('done' if step else 'pending') }}"
+           {% if step and step.status not in ('ok', 'running') %}data-status="{{ step.status }}"{% endif %}
+           {% if expanded %}data-expanded="true"{% endif %}
+           {% if step %}data-step="{{ step.id }}"{% endif %}>
+
+    <header class="card__head">
+      {# Numbered by CSS counter. The agentic cards are always in the document and
+         hidden when a single-shot strategy is selected, so a number written here would
+         read 01 02 05 the moment they were hidden. A counter only counts what is
+         displayed. #}
+      <span class="card__n" aria-hidden="true"></span>
+      <h3 class="card__name">{{ stage.title }}</h3>
+      {# The span is always emitted so the stylesheet has somewhere to write
+         "running…", but it carries no duration until the step has one: `duration_ms`
+         is zero while the body is still running, and "0 ms" beside a working stage is
+         a wrong number rather than a missing one. #}
+      {% if step %}
+      <span class="card__metrics">
+        {%- if not running -%}
+        {{ step.duration_ms }} ms
+        {#- Below half a hundredth of a cent the figure is shown at eight places rather
+            than rendered as `$0.00000`, which reads as free. A retrieval's embedding
+            really does cost a fraction of a cent, and cost is the one number this
+            platform must never misreport. -#}
+        {%- if step.cost_usd >= 0.000005 %}
+        &middot; <span class="money">${{ '%.5f' | format(step.cost_usd) }}</span>
+        {%- elif step.cost_usd %}
+        &middot; <span class="money">${{ '%.8f' | format(step.cost_usd) }}</span>
+        {%- endif %}
+        {%- endif -%}
+      </span>
+      {% endif %}
+      {% if expanded %}
+      {# Back to the whole canvas. A real link, so it works with scripts disabled. #}
+      <a class="card__close" href="/{{ keep_only }}" title="Back to the whole canvas">&times;</a>
+      {% endif %}
+    </header>
+
+    {% if step and expanded and not running %}
+
+    {# The other retrievals in this run — one per sub-question, so an agentic run shows
+       what the decomposition actually paid for. The canvas has room for one Search card
+       and binds the last one, and these are the most interesting thing an agentic run
+       produces.
+
+       Indexing used to be here too, a chip per document, and it never worked: the chip
+       linked to `/?stage=<an earlier document's chunk>`, which matched no card, so the
+       board opened with nothing expanded and every card still drew the last document.
+       Choosing a document is the sidebar's job now, and it moves all four stages. #}
+    {% if siblings %}
+    <nav class="siblings">
+      <span class="siblings__label">searched for</span>
+      {% for sib in siblings %}
+      <a class="siblings__item {{ 'siblings__item--on' if sib.id == step.id }}"
+         href="/?stage={{ sib.id }}{{ keep }}"
+         data-step="{{ sib.id }}">{{ sibling_label(sib) | e }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    <p class="card__why">{{ STAGE_WHY.get(step.step_type, '') }}</p>
+    {% if step.error %}
+    <p class="card__error">{{ step.error | e }}</p>
+    {% endif %}
+
+    {% include "_stage_detail.html" %}
+
+    {# Narration is per-step and cached server-side. It belongs to the expanded card:
+       an explanation of *this* step's numbers has nothing to say about a miniature. #}
+    <details class="card__narrate" data-step="{{ step.id }}">
+      <summary>Explain this step in plain language</summary>
+      <p class="card__narration">{{ step.narration | e if step.narration else '' }}</p>
+    </details>
+
+    {% elif step and not running %}
+
+    {% include "_card_art.html" %}
+    {# The whole card is the link. A pseudo-element rather than wrapping the card in an
+       anchor, because the miniatures contain their own structure and nesting all of it
+       inside a link makes it one enormous focus target that reads terribly aloud.
+       Present only while collapsed — an expanded card holds the chunk pager and the
+       narration control, and an invisible overlay across them would swallow both. #}
+    <a class="card__open" href="/?stage={{ step.id }}{{ keep }}" data-step="{{ step.id }}">
+      <span class="visually-hidden">Open the {{ stage.title }} stage</span>
+    </a>
+
+    {% else %}
+
+    {# Pending, or running. Both say what the stage is for — there is no data yet, and
+       a miniature of data that does not exist is exactly the thing this platform
+       exists not to draw. #}
+    <p class="card__why">{{ stage.why }}</p>
+
+    {% endif %}
+  </article>
+</li>

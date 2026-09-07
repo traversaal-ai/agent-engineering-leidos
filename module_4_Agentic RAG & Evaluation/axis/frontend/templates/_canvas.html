@@ -1,0 +1,139 @@
+{# The canvas: the whole of RAG as one diagram, both phases, always on screen.
+
+   Two tracks — "Indexing, once per document" then "Answering, every question" — which
+   is the Naive RAG notebook's own Phase A / Phase B framing. A student arriving from the
+   notebook should recognise the shape before reading a word of it.
+
+   Between them sits the index: the object both phases touch, and the one thing a strip
+   of stages can never show. It fills as vectors are written and lights up while a search
+   reads it, which is what makes "the index" a thing rather than a word.
+
+   **Rendered here and nowhere else.** `_pipeline.html` and `axis.js` once drew the same
+   run from two sides and drifted twice — first over how repeated retrievals were grouped,
+   then over the attributes that give a reloaded run its colours. The cards carry far more
+   than those nodes did, so a third drift would mean a student is shown different numbers
+   live than on reload, in a tool whose entire claim is that the numbers are real.
+   `axis.js` fetches this fragment from `/canvas` and swaps it in. One renderer, and the
+   no-JavaScript path gets the same diagram for free.
+
+   Expects `stages`, `stage_steps`, `stage` (the expanded step, or none), `asked`,
+   `siblings`, `sibling_label`, `answer`. #}
+
+{# `stage` is the loop variable below — one stage definition per card — so the
+   opened step is named apart from it. #}
+{% set open_step = stage %}
+{% set expanded_id = open_step.id if open_step else None %}
+{# `index_total` comes from the newest Store step in the session, not from the one the
+   indexing track is currently showing. The band below is the index itself and belongs to
+   neither track: read off the selected document's Store step, choosing the first of four
+   documents made the band report the index shrinking to what it held back then. #}
+{% set indexed = index_total or 0 %}
+
+<div class="canvasboard" {% if expanded_id %}data-expanded="true"{% endif %}>
+
+  {% for phase in ('index', 'query') %}
+  {% set phase_stages = stages | selectattr('phase', 'equalto', phase) | list %}
+  {# The track a card was expanded in grows; the other compresses to a spine, so the
+     flow is never lost while you read one stage of it. #}
+  {% set has_expanded = open_step and open_step.step_type in (phase_stages | map(attribute='type') | list) %}
+  <section class="track track--{{ phase }}"
+           {% if has_expanded %}data-open="true"{% endif %}>
+
+    <header class="track__head">
+      <h2 class="track__name">{{ 'Indexing' if phase == 'index' else 'Answering' }}</h2>
+      <span class="track__when">
+        {{- 'once per document' if phase == 'index' else 'every question' -}}
+      </span>
+      <span class="track__subject">
+        {%- if phase == 'index' -%}
+        {# Named, because all four cards describe *one* document — by default the last
+           one indexed, or whichever was chosen in the sidebar. After loading four
+           documents the track reads "1 block, 1 chunk", which is true of the PNG that
+           finished last and baffling without the filename beside it. #}
+        {% set parsed = stage_steps.get('parse') %}
+        {{ ((parsed.attributes or {}).get('filename') | e) if parsed else '' }}
+        {%- if indexed_documents | length > 1 %}
+        <span class="track__of">of {{ indexed_documents | length }} &mdash; pick one in the sidebar</span>
+        {%- endif -%}
+        {%- elif asked -%}
+        &ldquo;{{ asked[:90] | e }}&rdquo;
+        {%- endif -%}
+      </span>
+    </header>
+
+    {# The cache, at the head of the answering track and belonging to it rather than
+       sitting in it. A band and not a card, for two reasons — the answering track
+       already carries six cards for an agentic run and a seventh does not fit a
+       viewport that must not scroll, and more importantly a hit means the question
+       never *entered* the pipeline. A card would imply it passed through a stage;
+       a band that lights while the track behind it greys out draws what actually
+       happened. See CACHE_STAGE in frontend/app.py. #}
+    {% if phase == 'query' and cache_step %}
+    {% set c = cache_step.attributes or {} %}
+    <div class="cacheband" data-hit="{{ 'true' if c.get('hit') else 'false' }}"
+         data-skipped="{{ (c.get('skipped_reason') or '') | e }}">
+      <span class="cacheband__label">
+        asked before?
+        {%- if c.get('hit') %} &middot; yes{% elif c.get('skipped_reason') %} &middot; not checked{% else %} &middot; no{% endif %}
+      </span>
+      <span class="cacheband__note">
+        {%- if c.get('hit') -%}
+        answered from store at {{ '%.3f' | format(c.get('similarity') or 0) }}
+        similarity &mdash; nothing below this ran
+        {%- elif c.get('skipped_reason') == 'time_sensitive' -%}
+        this answer would go stale, so the cache was skipped in both directions
+        {%- elif c.get('skipped_reason') == 'disabled' -%}
+        the cache is switched off for this run
+        {%- elif c.get('skipped_reason') == 'empty' -%}
+        nothing stored yet
+        {%- else -%}
+        closest stored question scored
+        {{ '%.3f' | format(c.get('similarity') or 0) }}, under the
+        {{ c.get('threshold') }} threshold
+        {%- endif -%}
+      </span>
+    </div>
+    {% endif %}
+
+    <ol class="track__cards" {% if cache_hit %}data-skipped="true"{% endif %}>
+      {% for stage in phase_stages %}
+      {% set step = stage_steps.get(stage.type) %}
+      {% set expanded = step and step.id == expanded_id %}
+      {% include "_card.html" %}
+      {% endfor %}
+    </ol>
+  </section>
+
+  {# The index, between the two tracks and belonging to neither.
+     Deliberately not joined to the Search card by a drawn elbow: Search moves two
+     columns to the right the moment an agentic strategy is selected, and an arrow
+     pointing at where a card used to be reads as broken rather than as moved. The band
+     lights up while a search runs instead, and the Search card says it reads here. #}
+  {% if phase == 'index' %}
+  <div class="indexband" data-filled="{{ 'true' if indexed else 'false' }}">
+    <span class="indexband__label">
+      the index
+      {%- if indexed %} &middot; {{ indexed }} vector{{ '' if indexed == 1 else 's' }}{% endif %}
+    </span>
+    <span class="indexband__dots" aria-hidden="true">
+      {%- for i in range([indexed, 60] | min) -%}<span></span>{%- endfor -%}
+    </span>
+    <span class="indexband__note">
+      {{- 'written by Store, read by Search' if indexed else 'nothing stored yet' -}}
+    </span>
+  </div>
+  {% endif %}
+  {% endfor %}
+
+  {# Said on the canvas, not only in the sidebar where it was set. A pause a viewer
+     cannot see is one they will read into the durations beside it — and those are
+     measured across the work alone, which is the whole reason a deliberate delay is
+     allowed in here at all. #}
+  {% if pace_ms %}
+  <p class="canvasboard__paced">
+    paced for teaching &mdash; {{ '%.1f' | format(pace_ms / 1000) }}s between stages
+    &middot; every timing and cost shown is measured
+  </p>
+  {% endif %}
+
+</div>

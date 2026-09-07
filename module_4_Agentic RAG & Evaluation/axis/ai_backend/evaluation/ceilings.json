@@ -1,0 +1,71 @@
+{
+  "measured_at": "2026-09-07T12:11:50+00:00",
+  "conditions": {
+    "embedding_provider": "openai",
+    "embedding_model": "text-embedding-3-small",
+    "top_k": 5,
+    "min_similarity": 0.25,
+    "hybrid": false,
+    "corpus": "ca6a18f2f7b3ea5c61ad4bb3b0658d23fdfa72ba677a463b68ff938d0847dee3"
+  },
+  "ceilings": {
+    "decomposition": {
+      "unit": "facts",
+      "improved": 3,
+      "eligible": 3,
+      "questions": [
+        {
+          "question_id": "gfe-delay-remedy",
+          "before": 0.0,
+          "after": 1.0
+        },
+        {
+          "question_id": "key-personnel-risk-owner",
+          "before": 0.0,
+          "after": 1.0
+        },
+        {
+          "question_id": "ceiling-vs-nte",
+          "before": 0.0,
+          "after": 1.0
+        }
+      ]
+    },
+    "hop": {
+      "unit": "facts",
+      "improved": 1,
+      "eligible": 1,
+      "questions": [
+        {
+          "question_id": "deliverable-at-risk",
+          "before": 0.0,
+          "after": 1.0
+        }
+      ]
+    },
+    "resolution": {
+      "unit": "recall",
+      "improved": 1,
+      "eligible": 1,
+      "questions": [
+        {
+          "question_id": "agreement-term",
+          "before": 0.0,
+          "after": 1.0
+        }
+      ]
+    },
+    "coverage": {
+      "unit": "coverage",
+      "improved": 1,
+      "eligible": 1,
+      "questions": [
+        {
+          "question_id": "summarize-program",
+          "before": 0.1282051282051282,
+          "after": 1.0
+        }
+      ]
+    }
+  }
+}

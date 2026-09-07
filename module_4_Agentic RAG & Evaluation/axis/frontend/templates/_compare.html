@@ -1,0 +1,129 @@
+{# The comparison table: one column per strategy, plus ratios and a verdict.
+
+   Cross-run rather than a stage of a pipeline, which is why it is its own page rather
+   than a card on the canvas — it spans two runs under two strategies, and nothing on the
+   canvas has that lifetime.
+
+   Expects `comparison`. #}
+
+{% if comparison %}
+
+{# The two runs asked different things.
+
+   The numbers stay — they really are those two runs' numbers — and the verdict is
+   withheld upstream, because the verdict is the sentence that makes a causal claim about
+   orchestration and there is no causal claim to make between unrelated questions. Saying
+   so plainly is the point: a ratio is exactly the kind of figure a reader takes at face
+   value, and this page's whole worth rests on its figures meaning what they appear to. #}
+{% if not comparison.matched %}
+<div class="banner banner--warn">
+  <strong>These runs asked different questions.</strong>
+  The columns below are each run's real numbers, but the ratios between them compare two
+  different pieces of work &mdash; not what the orchestration costs. Choose the same
+  question under both strategies for that.
+</div>
+{% elif comparison.question %}
+<p class="compare__question">
+  Both runs answered &ldquo;{{ comparison.question | e }}&rdquo;
+</p>
+{% endif %}
+<div class="card">
+  <table class="compare">
+    <thead>
+      <tr>
+        <th scope="col"><span class="visually-hidden">Metric</span></th>
+        {% for col in comparison.columns %}
+        <th scope="col" data-strategy="{{ col.strategy }}">
+          <span class="compare__swatch" aria-hidden="true"></span>
+          {{ col.label }}
+        </th>
+        {% endfor %}
+        {% if comparison.columns | selectattr('ran') | list | length > 1 %}
+        {# The ratio column is why anyone reads this table. Without it a reader has
+           to divide 9749 by 3593 in their head to reach the finding, and in a demo
+           nobody does — so the headline stayed invisible in a table containing it. #}
+        <th scope="col" class="compare__delta">&Delta;</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in comparison.rows %}
+      <tr>
+        <th scope="row">{{ row.label }}</th>
+        {% for cell in row.cells %}
+        <td data-strategy="{{ cell.strategy }}">
+          {%- if row.kind == 'usd' -%}
+          <span class="money">${{ '%.6f' | format(cell.value) }}</span>
+          {%- elif row.kind == 'ms' -%}
+          {{ '%.1f' | format(cell.value / 1000) }}s
+          {%- else -%}
+          {{ cell.value }}
+          {%- endif -%}
+        </td>
+        {% endfor %}
+        {% if comparison.columns | selectattr('ran') | list | length > 1 %}
+        <td class="compare__delta">
+          {%- if row.ratio %}{{ '%.1f' | format(row.ratio) }}&times;{% else %}same{% endif -%}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+
+      {# Sources, listed rather than counted. "1 document" does not tell you whether
+         it was the *same* document, which is the whole question. #}
+      <tr>
+        <th scope="row">sources cited</th>
+        {% for col in comparison.columns %}
+        <td data-strategy="{{ col.strategy }}" class="compare__docs">
+          {%- if not col.ran -%}
+          &mdash;
+          {%- elif col.documents -%}
+          {{ col.documents | join(', ') | e }}
+          {%- else -%}
+          none
+          {%- endif -%}
+        </td>
+        {% endfor %}
+        {% if comparison.columns | selectattr('ran') | list | length > 1 %}
+        <td class="compare__delta"></td>
+        {% endif %}
+      </tr>
+    </tbody>
+  </table>
+
+  {% if comparison.verdict %}
+  {# The finding. Everything above is evidence for this one sentence. #}
+  <p class="verdict">{{ comparison.verdict | e }}</p>
+  {% elif comparison.matched %}
+  <p class="compare__note">
+    Ask the same question with the other strategy to fill the second column.
+  </p>
+  {% endif %}
+</div>
+
+{# The answers themselves.
+
+   The verdict ends by telling the reader to "compare the two answers above to judge
+   whether it used it any better" — and until now there were none on this page, so it
+   named the one thing its metrics cannot settle and then withheld it. The metrics say
+   what each run cost; only these say what it bought. Nothing here characterises them:
+   that needs `evaluation/scoring.py` and a golden set behind it, which is Milestone 3's
+   cross-strategy report. #}
+{% set answered = comparison.columns | selectattr('answer') | list %}
+{% if answered %}
+<div class="answers">
+  {% for column in answered %}
+  <section class="answers__one" data-strategy="{{ column.strategy }}">
+    <p class="eyebrow eyebrow--accent">{{ column.label }}</p>
+    {% set answer = column.answer %}
+    {% include "_answer.html" %}
+  </section>
+  {% endfor %}
+</div>
+{% endif %}
+{% else %}
+<p class="empty">
+  Ask the same question under both strategies, and the cost of the extra
+  orchestration &mdash; and what it bought &mdash; appears here.
+</p>
+{% endif %}

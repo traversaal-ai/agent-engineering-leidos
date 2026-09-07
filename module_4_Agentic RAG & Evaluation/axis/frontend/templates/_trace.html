@@ -1,0 +1,91 @@
+{# One trace step. Rendered server-side for the snapshot view and used as the
+   reference shape for the SSE-appended fragments.
+
+   Three things this template has to get right, each traceable to a requirement:
+
+   - `status` drives the rail colour, so a cap being reached reads as
+     "stopped, budget reached" rather than as a crash (System Design Section 11).
+   - Cost and duration sit on every step, because attributing cost to the step
+     that incurred it is what makes an agentic run's expense legible rather than
+     just larger.
+   - Raw and narrated are both present, with narrated fetched on demand. The
+     first toggle costs an LLM call, every toggle after it is free
+     (PRD Section 6).
+
+   `| e` on every interpolated value is not decoration. Step output contains
+   LLM-generated text derived from uploaded documents, which is untrusted input;
+   System Design Section 6.5 ranks output sanitisation fourth for exactly this
+   path. #}
+
+<article class="step step--{{ step.status }}" data-step-id="{{ step.id }}"
+         {% if step.parent_step_id %}data-parent="{{ step.parent_step_id }}"{% endif %}>
+  <header class="step__head">
+    <span class="step__type">{{ step.step_type | e }}</span>
+    <span class="step__label">{{ step.label | e }}</span>
+    <span class="step__metrics">
+      {{ step.duration_ms }} ms
+      {%- if step.cost_usd %}
+      &middot; <span class="money">${{ '%.5f' | format(step.cost_usd) }}</span>
+      {%- endif %}
+      {%- if step.prompt_tokens or step.completion_tokens %}
+      &middot; {{ step.prompt_tokens }}&rarr;{{ step.completion_tokens }} tok
+      {%- endif %}
+    </span>
+  </header>
+
+  {% if step.status == 'budget_exceeded' %}
+  <p class="step__stopped">
+    Stopped: budget reached.
+    {{ step.attributes.get('stopped_reason', '') | e }}
+  </p>
+  {% elif step.error %}
+  <p class="step__error">{{ step.error | e }}</p>
+  {% endif %}
+
+  <div class="step__views">
+    {# Closed by default. It used to be `open`, which was fine for Naive RAG's four
+       steps and unreadable at Agentic RAG's fourteen: every step expanded to its full
+       prompt and completion, so the trace became a wall of text several screens long
+       and the panels below it — including the comparison — were effectively hidden.
+
+       The step head already carries type, component, duration, cost and tokens, so
+       closed still answers "what happened and what did it cost". Opening one is for
+       "and what exactly did it say". #}
+    <details class="step__raw">
+      <summary>Raw</summary>
+      {% if step.raw_input %}<pre class="step__in">{{ step.raw_input | e }}</pre>{% endif %}
+      {% if step.raw_output %}<pre class="step__out">{{ step.raw_output | e }}</pre>{% endif %}
+    </details>
+
+    {# `data-narrate` is read by axis.js, which POSTs and inserts the narration text.
+       It replaces four HTMX attributes that appended the response body into the page
+       — but the endpoint returns JSON (`{step_id, narration, generated}`), so what
+       they would have inserted was a raw JSON object. They never ran at all, because
+       HTMX was never downloaded, which is how that went unnoticed for two milestones.
+
+       **It points at the Frontend, not the API**, and that was the second half of the
+       same bug. This URL used to be `/api/v1/sessions/{id}/trace/{step}/narrate`,
+       which requires `Authorization: Bearer <token>` — and the token lives in an
+       `httponly` cookie precisely so no script can read it. So every narration
+       request from the page was a 401, while the acceptance test passed the header
+       itself and stayed green throughout.
+
+       Without JavaScript the disclosure still opens and explains that narration
+       needs it, rather than appearing broken. #}
+    <details class="step__narrated">
+      <summary
+        {% if not step.narration and session_id %}
+        data-narrate="/narrate/{{ step.id }}"
+        {% endif %}>
+        Narrated
+      </summary>
+      <p class="step__narration">{{ step.narration | e if step.narration else '' }}</p>
+      {% if not step.narration %}
+      <p class="muted">
+        A plain-language explanation, generated on demand and then cached.
+        {% if not session_id %}Ask a question first.{% endif %}
+      </p>
+      {% endif %}
+    </details>
+  </div>
+</article>
