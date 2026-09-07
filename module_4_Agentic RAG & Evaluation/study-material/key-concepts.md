@@ -1,0 +1,21 @@
+# Module 4: Key Concepts (Glossary)
+
+- **Agentic RAG**: Agent-based RAG implementation. Utilizes intelligent agents that can plan, reason, and learn over time; RAG becomes just one tool an agent can decide to use.
+- **Agent Ingredients vs. Full Agents**: A spectrum from simple/lower-cost/lower-latency (Routing, Tool Use, One-Shot Query Planning, Conversation Memory) to advanced/higher-cost/higher-latency (ReAct, Dynamic Planning + Execution).
+- **Routing**: The simplest form of agentic reasoning, uses an LLM to pick the downstream RAG pipeline (e.g. choosing between two RAG query engine tools).
+- **One-Shot Query Planning**: Breaks a query into parallelizable sub-queries, executes each against a RAG pipeline, then synthesizes the sub-responses into a final answer.
+- **Tool Use**: Uses an LLM to call an API and infer that API's parameters; the tool calls the external API/DB, and the agent synthesizes the final response.
+- **Conversation Memory**: A flat list of the conversations the agent had with the user, fetched and updated on every turn of the agent's reasoning loop.
+- **The Five Pillars of Evaluation**: A pyramid of five levels (LLM Quality + Efficiency, Reasoning, Retrieval, Generation, Agent) grouped into three domains: The LLM Core, The RAG Engine, The Agent Interface.
+- **Why the pyramid is ordered**: Each level assumes the one beneath it already works. Asking whether the model used its context faithfully is meaningless if the retriever handed it the wrong context, so a Level 5 agent failure is often a Level 3 retrieval failure in disguise.
+- **Level 3, Retrieval Evals**: Measures whether the system finds the right information efficiently: relevance, recall, precision. Benchmarks: BEIR, MS MARCO, Natural Questions. Metrics: NDCG@k, Recall@k, Precision@k, MRR.
+- **What each retrieval metric is sensitive to**: NDCG@k -> order, Recall@k -> completeness, Precision@k -> cleanliness, MRR -> how fast the first right answer appears. They disagree on purpose; pick the one matching the failure you have.
+- **Reranking's reach**: A reranker changes the order of results but not their membership, so it can move NDCG@k and MRR but never Recall@k. A document that never made the top k is an upstream chunking/embedding/retrieval-depth problem.
+- **Level 4, Generation Evals**: Measures whether the final answer is grounded in the retrieved documents. Core challenge: preventing hallucination. Metrics: Faithfulness, Answer Relevancy, Context Precision, Context Recall, Groundedness, Hallucination Rate, Completeness.
+- **The two halves of a RAG answer**: Context Precision and Context Recall measure the retrieval half (do you have the right material); Faithfulness, Groundedness, Hallucination Rate and Completeness measure the generation half (did the model use it correctly and fully). They fail independently.
+- **Faithfulness**: Does the generated answer directly follow from the provided context? The most direct measure against hallucination.
+- **Groundedness**: Whether the claims in a response are supported by the source data.
+- **Hallucination Rate**: The frequency of unsupported outputs.
+- **Completeness**: Whether the response covers all aspects of the query.
+- **Context Precision / Context Recall**: Whether the retrieved context is necessary and concise (signal-to-noise), and whether it contains everything needed to answer completely.
+- **Diagnostic order**: Read the retrieved context before judging the answer. If the needed material isn't there, it's a Context Recall problem and the generation metrics are misleading, the model was never given a chance.

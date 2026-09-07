@@ -1,4 +1,4 @@
-# Module 4: Agentic RAG & Voice AI
+# Module 4: Agentic RAG & Evaluation
 
 ## Learning outcomes for Module 4
 
@@ -8,7 +8,9 @@ By the end of this module you can:
 - Describe what Agentic RAG is
 - Explain routing, decomposition (one-shot query planning), and semantic caching
 - Compare Naive RAG vs. Agentic RAG
-- Understand Voice AI architectures: Speech-to-Speech (S2S) and Cascaded (STT -> LLM -> TTS)
+- Place a RAG failure on the Five Pillars of Evaluation and name the domain it belongs to
+- Describe Level 3 Retrieval Evals: relevance, recall, and precision, and what each key metric is sensitive to
+- Describe Level 4 Generation Evals, and tell a retrieval-half failure apart from a generation-half one
 
 ---
 
@@ -180,137 +182,145 @@ The module walks through a live, side-by-side demo comparing a Naive RAG pipelin
 
 ---
 
-## Concept 7: Voice AI Architectures
+## Concept 7: The Five Pillars of Evaluation
 
-Voice AI is becoming **the new interface**: enterprise-ready voice AI agents for automated phone calls, voice AI for regulated industries, speaking human to every customer, AI call centers, and AI voice agents for handling inbound calls are now offered widely across the vendor landscape.
+Concepts 1-6 were about building a retrieval system and then giving an agent the judgement to use it. This half of the module is about the question that follows immediately: **how do you know it works?**
 
-**Two architectures: S2S for speed, Cascaded for control.** There are two fundamental approaches: a direct **Speech-to-Speech (1 hop)** pipeline for low latency, and a **Cascading (3 hops)** pipeline that trades speed for flexibility and control.
+"It seems fine" is not an answer you can act on. Evaluation gives you a place to stand, a hierarchy of capability called the **Five Pillars**, where each level assumes the one beneath it already works.
 
 ```
-Speech-to-Speech — 1 hop
-User Speech -> [Speech-to-Speech Model: audio in -> audio out, natively] -> Agent Speech
-
-Cascaded — 3 hops
-User Speech -> [STT: speech -> text] -> [LLM: understand + respond] -> [TTS: text -> speech] -> Agent Speech
+                    Level 5: Agent Evals              -> Domain 3: The Agent Interface
+        Level 4: Generation Evals
+    Level 3: Retrieval Evals                          -> Domain 2: The RAG Engine  (this module's focus)
+Level 2: Reasoning Evals
+Level 1: LLM Quality + Efficiency Evals                -> Domain 1: The LLM Core
 ```
 
-**How an S2S model differs from an LLM.** Both a standard text LLM (GPT, Claude, Llama, Gemini) and an S2S model (gpt-realtime, Gemini Live, native audio) share the **same core**: a decoder-only transformer. What differs: input (text vs. audio encoded to audio tokens), the token stream (text-only vs. unified audio+text+image+video), and output (text tokens vs. audio tokens decoded to 24kHz PCM, delivered as full-duplex streaming with VAD and barge-in over WebSocket, vs. a detokenized text response).
+The five levels group into **three domains**: Domain 1, The LLM Core (Levels 1-2), Domain 2, The RAG Engine (Levels 3-4), and Domain 3, The Agent Interface (Level 5).
 
-**One transformer, full-duplex, native barge-in.** The model layer (native audio, multimodal): audio encoded into tokens, mixed with text/image/video in one stream; a single transformer reasons across all modalities together; generates output audio tokens directly, no separate TTS step; an optional parallel text transcript is the only way to get text out; streams in/out over a full-duplex WebSocket with built-in VAD and barge-in; tool calling still works mid-turn.
+Each level exists to answer one question:
 
-**Comparing closed-source S2S models:**
+| Level | Core question |
+|-------|---------------|
+| 1. LLM Quality + Efficiency | Is the underlying model good enough, and cheap and fast enough, to build on at all? |
+| 2. Reasoning | Can the model actually reason over what it is given? |
+| 3. Retrieval | Can the system find the right information efficiently? |
+| 4. Generation | Is the final answer grounded in the retrieved documents? |
+| 5. Agent | Does the agent, using the whole stack as tools, accomplish the task it was given? |
 
-| Provider | Model | Cost (input) | Cost (output) | Latency |
-|---|---|---|---|---|
-| Google | gemini-3.1-flash-live-preview | $3.00/M audio tok (~$0.005/min) | $12.00/M audio tok (~$0.018/min) | ~960ms-2.98s |
-| OpenAI | gpt-realtime-2.1-mini | $10.00/M audio tok / $0.60/M text tok | $20.00/M audio tok / $2.40/M text tok | ~500ms |
-| xAI | Grok Voice Agent API | $0.05/minute (all-in) | — (single flat rate) | <1s time-to-first-audio |
+**Why the order matters.** The pyramid is a pyramid because each level rests on the one below. Asking "did the model use its context faithfully?" is meaningless if the retriever handed it the wrong context in the first place. The same logic runs all the way up: a Level 5 agent failure is very often a Level 3 retrieval failure wearing a costume.
 
-**Open-source S2S is still immature across every option** — see `../reference/voice-ai-architectures.md` for the five specific models named and why each falls short (missing plugins, gated weights, closed hosted realtime layers, no tool support, or missing function calling/transcripts/memory).
-
-**S2S pros/cons, at a glance:** lower latency, native emotion/tone/pace, better barge-in, simpler one-vendor architecture, no transcription errors, no lost context between handoffs — versus below-dedicated-TTS voice quality, no transcripts by default, weak tool use, lower STT accuracy on accents/jargon, few model options, expensive audio tokens, and being hard to observe or debug.
-
-**Cascaded: three swappable, tunable stages.** Three discrete, independently swappable models chained with text at every boundary: Audio Input -> Speech-to-Text (STT/ASR) -> LLM Reasoning -> Text Response -> Text-to-Speech (TTS) -> Agent Speech, in a continuous conversation loop. You pick each stage independently (accuracy, cost, language, voice).
-
-**Comparing closed-source cascaded models:**
-
-| Provider | STT | LLM | TTS | Cumulative Cost (input) | Cumulative Cost (output) | Cumulative Latency |
-|---|---|---|---|---|---|---|
-| Google | gemini-3.1-flash-lite | gemini-2.5-flash | gemini-3.1-flash-tts-preview | $1.80/M tok | $24.00/M tok | ~1.5-3s+ |
-| OpenAI | gpt-4o-mini-transcribe | gpt-5.4-mini | gpt-4o-mini-tts | $2.60/M tok | $21.50/M tok | ~1.5-3s |
-| xAI | Grok Speech-to-Text | Grok 4.3 | Grok Text-to-Speech | $16.25/M tok | $2.50/M tok + streaming/hr | Not officially published |
-
-**Cascaded pros/cons, at a glance:** any/custom/cloned voice, best-in-class STT accuracy, full transcripts, easy tool calls/RAG/guardrails, dozens of provider combos, cheaper at scale, independently swappable, observable — versus higher latency (3 sequential handoffs), more moving parts, context loss between stages, transcription errors propagating to the LLM, less natural turn-taking, three vendor relationships/bills, extra barge-in engineering, and lost emotion/tone.
-
-**Open-source now covers every cascade stage:** open TTS (Fish Audio S2 Pro, Step Audio EditX, Voxtral TTS), open STT/ASR (Nemotron 3 ASR, Voxtral Mini/Realtime, Qwen3-ASR-1.7B), and open LLMs (GLM-5.2, DeepSeek V4 Pro, Kimi K2.6/K2.7).
-
-**NVIDIA and Soniox win cheap-and-fast** on the price-vs-latency quadrant of cascaded STT+TTS combinations (NVIDIA ~$0.15/hr at ~300ms; Soniox ~$0.82/hr at ~350ms), while Google and OpenAI land in the "slow & pricey, avoid" quadrant, and ElevenLabs is fast but premium-priced.
-
-**S2S wins speed; Cascaded wins flexibility**, across latency, naturalness, cost (which flips by provider, see `../reference/voice-ai-architectures.md`), debuggability, flexibility/lock-in, and current (2026) enterprise adoption, where cascaded still dominates production deployments for control, cost, and compliance while S2S adoption is emerging where latency and naturalness dominate.
-
-**Choosing between them:** Choose S2S when latency is the top priority, emotional context matters, the agent is a simple conversational one with no complex tool use, natural interruption is critical, infrastructure should be minimal, or the conversation is short and self-contained. Choose Cascaded when you need a specific/cloned/brand voice, high STT accuracy, full transcripts for compliance, structured tool calls/RAG/guardrails, cost sensitivity at scale, or provider flexibility.
+This module goes deep on **Domain 2, The RAG Engine**: Levels 3 and 4. Levels 1, 2 and 5 are named here for orientation only.
 
 ---
 
-## Concept 8: Voice AI Frameworks
+## Concept 8: Level 3, Retrieval Evals
 
-**The voice landscape** spans an Application Layer (vertical products across Call Center, Customer Service/Support, Restaurant/Hospitality, Emergency Response, Finance/Banks, Home Services, Real Estate, Insurance, Logistics/Fleet, Medical, Sales, and Recruiting) built on an Infrastructure Layer (Voice to Voice, Voice Eval and Testing, Voice Middleware, ASR, TTS, and LLMs/SLMs).
+**Core question:** Can the system find the right information efficiently?
 
-**Debunking the voice stack, four layers:**
+A powerful reasoning engine is useless if it operates on flawed or incomplete information. This pillar measures the retrieval system that feeds context to the LLM, specifically the **relevance, recall, and precision** of the sources it cites.
 
 ```
-Layer 4: Reasoning (Optional)   — General agent framework (e.g. LangGraph) for memory, multi-step workflows, and tools.
-Layer 3: Orchestration          — Turn-taking, barge-in, VAD, state, and latency budgeting.
-Layer 2: Intelligence           — STT -> LLM -> TTS, or a single Speech-to-Speech (S2S) model.
-Layer 1: Transport / Media      — Real-time audio streams (WebRTC, WebSocket, SIP), jitter, and echo cancellation.
+[Vector DB + retrieval pipeline] -> [Context Filter] -> Evaluation Focus:
+                                                          - Relevance: Does the retrieved context
+                                                            directly answer the query?
+                                                          - Recall: Did the system pull all
+                                                            necessary documents?
+                                                          - Precision: Is the retrieved data
+                                                            free of distracting, irrelevant noise?
 ```
 
-The "which framework" question is ultimately about **who owns these layers and how freely you can swap each block**.
+**Common benchmark datasets:** **BEIR (Benchmarking-IR)**, a diverse collection of information retrieval tasks; **MS MARCO**, a large-scale dataset for passage ranking and reading comprehension; and **Natural Questions (NQ)**, queries from real Google search users that require finding answers in Wikipedia articles.
 
-**Two categories of framework:**
+**Key performance metrics:**
 
-1. **Model-Agnostic Orchestrators** (also Open-Source): Build it yourself. Frameworks that own timing and integration, allowing you to bring your own models. Examples: **LiveKit Agents**, **Pipecat**. For teams that need control over latency, cost, model choice, or self-hosted deployment.
-2. **Full-Stack Managed Platforms** (also Closed-Source): Hosted and configured. Bundled telephony, orchestration, and models behind a managed API. Examples: **ElevenLabs**, **Vapi**. For teams that want to move fast without managing infrastructure.
+| Metric | What it measures | What it's sensitive to |
+|--------|------------------|------------------------|
+| NDCG@k | Ranking quality, rewarding highly relevant documents placed at the top | *Order* |
+| Recall@k | What percentage of all relevant documents were found in the top k | *Completeness* |
+| Precision@k | Of the top k retrieved, what percentage were relevant | *Cleanliness* |
+| MRR (Mean Reciprocal Rank) | The rank of the first correct answer | *How fast* the first right answer shows up |
 
-**ElevenAgents: no-code templates.** For simple use cases, users don't even need to set up an ADK agent and can use fully managed voice agent platforms with browsable templates.
+The right-hand column is the part worth memorizing. These four metrics are not four ways of saying the same thing, they disagree on purpose. A relevant document buried at position 10 scores worse under NDCG@k than the same document at position 1, but Recall@k cannot tell the two situations apart at all.
 
-**Live demo: Iris (Traversaal.ai's Customer Support Agent).** URL: `https://traversaal-iris.vercel.app/`. Modeled as a workflow: Start -> Initial Inquiry -> (the caller's primary interest has been identified) -> Provide Information & Next Steps -> (the agent has provided all relevant info) -> Wrap Up.
+**One result set, four different scores.** Take a query against a knowledge base holding **5 relevant documents in total**. The retriever returns the top 5 (`R` = relevant, `x` = not):
 
-**Managed for speed, open-source for control:**
+```
+rank:      1     2     3     4     5
+result:    x     R     R     x     R
+```
 
-| | Vapi | ElevenLabs | LiveKit Agents | Pipecat |
-|---|---|---|---|---|
-| Type | Managed SaaS | Managed SaaS | Open-source | Open-source |
-| Platform cost/min | $0.05 + providers | $0.08 bundled | $0 self-hosted | $0 self-hosted |
-| Free tier | 60+ min/mo | 15 min/mo | 1,000 min/mo | WebRTC free |
-| STT | 6+ providers (BYOK) | Own Scribe v2 only | 3+ via plugins | 20+ providers |
-| LLM | 10+ providers | 10+ (BYO endpoint) | Any | Any (20+) |
-| Self-hostable | ✗ | ✗ | ✓ | ✓ |
-| SIP / telephony | ✓ | ✓ | ✓ | ✓ Cloud only |
-| Website embed | Widget + SDK | Widget (easiest) | WebRTC SDK | DIY only |
-| Lock-in | Low-Medium | High | Very Low | Very Low |
-| Best for | BYOK + flexibility | Best voice quality | Scale + cost | Custom pipelines |
+- **Recall@5** = 3 relevant found / 5 that exist = **0.60**. Two relevant documents never surfaced.
+- **Precision@5** = 3 relevant / 5 returned = **0.60**. Two slots wasted on noise.
+- **MRR** = 1 / 2 (first relevant is at rank 2) = **0.50**. Blind to everything below rank 2.
+- **NDCG@5** is the only one of the four that would change if you *reordered these same five results* without adding or removing any.
+
+Recall@5 and Precision@5 tie at 0.60 here only because k happens to equal the number of relevant documents; they answer different questions and diverge the moment that stops being true. And the practical consequence: **a reranker changes order, not membership**, so it can only move NDCG@k and MRR. If two relevant documents never made the top 5 at all, no reranker will save you, that is a recall problem living upstream in chunking, embedding, or retrieval depth.
+
+See `../reference/rag-evaluation.md` for the full deep dive.
+
+---
+
+## Concept 9: Level 4, Generation Evals
+
+**Core question:** Is the final answer grounded in the retrieved documents?
+**Core challenge:** preventing hallucination.
+
+This is the test that the LLM isn't "freelancing" with its creativity. Level 3 asked whether the right material reached the model; Level 4 asks what the model then did with it. Unlike Level 3, this level leans less on standard benchmarks and more on metrics that judge the generation *relative to the retrieved context*:
+
+- **Faithfulness**: Does the generated answer directly follow from the provided context? A direct measure against hallucination.
+- **Answer Relevancy**: Is the answer relevant to the user's original query?
+- **Context Precision**: Is the retrieved context necessary and concise for the query? (Signal-to-noise ratio.)
+- **Context Recall**: Did the retriever find everything needed to answer completely?
+
+Plus, on generation quality specifically: **Faithfulness** (response stays within retrieved context), **Groundedness** (claims are supported by source data), **Hallucination Rate** (frequency of unsupported outputs), and **Completeness** (covers all aspects of the query).
+
+```
+Retrieved Facts  ->  Synthesis Filter  ->  Faithful Output
+[Evaluate: Retrieval Quality]         [Evaluate: Generation Quality]
+```
+
+**The two halves, and why the distinction pays for itself.** Look at where that list splits. Context Precision and Context Recall are about the **retrieval half**, do you even have the right material. Faithfulness, Groundedness, Hallucination Rate and Completeness are about the **generation half**, given that material, did the model use it correctly and fully.
+
+A RAG system can fail at either half independently: perfect retrieval with a model that ignores its context and hallucinates anyway, or flawless, faithful generation built on incomplete retrieved context. So given a bad answer, **read the retrieved context before you read the answer**. If the material needed wasn't in it, you have a Context Recall problem and every generation metric is misleading, the model was never given a chance. Only once the context is right does a wrong answer become a genuine generation failure: an unsupported claim is caught by Faithfulness and Groundedness, a half-answer by Completeness, an answer about the wrong thing entirely by Answer Relevancy.
+
+The trap this avoids is tuning prompts to fix what is actually a retrieval bug.
+
+**And this is where the module's two halves meet.** Agentic RAG doesn't escape the pyramid, it just moves where failures originate. A **Router** picking the wrong knowledge base is a Level 3 failure, and the generator may then be perfectly faithful to context that came from the wrong place, so Faithfulness stays high while the answer is useless. **One-Shot Query Planning** raises Context Recall on comparison and multi-hop queries, but adds a synthesis step where the final answer can drift from what any individual sub-query retrieved, a Level 4 risk naive RAG doesn't have. Every decision point agency adds is a new place for a failure to originate.
+
+See `../reference/rag-evaluation.md` for the full deep dive on both levels.
 
 ---
 
 ## Key Takeaways
 
-1. Cascading pipeline **performs better** than S2S for complicated scenarios.
-2. Cascading pipeline gives us an option to explore **open source alternatives**, which reduces overall cost.
-3. The **latency** of an S2S model varies on a case-to-case basis, and outperforms cascaded pipeline.
-4. S2S maintains better **tone** and **context**.
-5. There exist **managed serverless voice agent platforms** for teams who want simpler solutions and don't want to manage the infrastructure.
-6. **Framework selection** for voice agents highly depends on user requirements. Certain open-source frameworks such as LiveKit and Pipecat provide support for all types of models, whereas SDKs such as Google ADK and OpenAI SDK, etc., have restricted support on voice models by other vendors.
-7. While selecting a framework, it is recommended to ensure that the selected framework provides **built-in transport layer** and **SIP support** for a seamless voice experience.
+1. **RAG is just one tool.** The reframe at the heart of Agentic RAG is that a query no longer has to travel the same fixed retrieval path every time, an agent decides whether and how to retrieve.
+2. **Four agent ingredients** — Routing, One-Shot Query Planning, Tool Use, Conversation Memory — buy most of the benefit at the simple, lower-cost, lower-latency end of the spectrum, before you reach for Full Agents (ReAct, Dynamic Planning + Execution).
+3. **Agency is not free.** Every decision point you add is a new place for a failure to originate, which is exactly why evaluation stops being optional once RAG becomes agentic.
+4. **Evaluation is a pyramid, not a checklist.** Five levels across three domains, and each level assumes the one beneath it works. A Level 5 agent failure is often a Level 3 retrieval failure in disguise.
+5. **A RAG answer has two halves that fail independently.** Retrieval (Context Precision, Context Recall) and generation (Faithfulness, Groundedness, Hallucination Rate, Completeness). Read the retrieved context before you judge the answer.
+6. **Retrieval metrics disagree on purpose.** NDCG@k cares about order, Recall@k about completeness, Precision@k about cleanliness, MRR about how fast the first right answer appears. Pick the one that matches the failure you actually have.
+7. **Reranking changes order, not membership.** It can move NDCG@k and MRR but never Recall@k, so a document that never made the top k is an upstream problem, not a ranking one.
 
 ---
 
 ## Appendix: Key terms to remember
 
-- **Full-duplex**: Audio can flow in both directions (listening and speaking) at the same time, like a real phone call.
-- **VAD (Voice Activity Detection)**: Detects when a person is actually speaking vs. silence/background noise, used to know when to start/stop listening.
-- **Barge-in**: When a user starts talking while the model is still speaking, and the system detects it and stops/flushes its own audio output to let the user interrupt naturally.
-- **WebRTC (Web Real-Time Communication)**: Open browser standard for streaming audio/video in real time, low latency, no plugins needed.
-- **SIP (Session Initiation Protocol)**: Signaling protocol used by phone systems to set up and manage calls. Bridges voice agents to real phone numbers and carriers.
-
-## Appendix: Evaluating RAG
-
-**Recap — a hierarchy of capability, the Five Pillars of Evaluation:** Level 5 Agent Evals, Level 4 Generation Evals, Level 3 Retrieval Evals, Level 2 Reasoning Evals, Level 1 LLM Quality + Efficiency Evals, grouped as Domain 3 The Agent Interface (Level 5), Domain 2 The RAG Engine (Levels 3-4, this module's Appendix focus), and Domain 1 The LLM Core (Levels 1-2).
-
-**Level 3: Knowledge Access.** Core question: Can the system find the right information efficiently? Measures relevance, recall, and precision of the sources cited. Common benchmark datasets: BEIR (Benchmarking-IR), MS MARCO, Natural Questions (NQ). Key performance metrics: NDCG@k, Recall@k, Precision@k, Mean Reciprocal Rank (MRR).
-
-**Level 4: Grounded Generation.** Core question: Is the final answer grounded in the retrieved documents? Core challenge: preventing hallucination. Metrics: Faithfulness, Answer Relevancy, Context Precision, Context Recall — and, on the generation-quality side specifically: Faithfulness (response stays within retrieved context), Groundedness (claims are supported by source data), Hallucination Rate (frequency of unsupported outputs), Completeness (covers all aspects of the query).
-
-See `../reference/rag-evaluation.md` for the full deep dive on both levels.
+- **Faithfulness**: Does the generated answer directly follow from the provided context? The most direct measure against hallucination.
+- **Groundedness**: Whether the claims in a response are supported by the source data.
+- **Hallucination Rate**: The frequency of unsupported outputs.
+- **Context Precision**: Is the retrieved context necessary and concise for the query? (Signal-to-noise ratio.)
+- **Context Recall**: Did the retriever find all the information needed to answer the query completely?
+- **NDCG@k**: Measures ranking quality, rewarding highly relevant documents placed at the top. The only common retrieval metric that responds to reordering alone.
+- **MRR (Mean Reciprocal Rank)**: Measures the rank of the first correct answer, and nothing below it.
 
 ## Summary
 
 1. Naive RAG's Ingestion/Retrieval/Generation pipeline, chunking strategies, and pain points (summarize, comparison, implicit/multi-hop, memory) carry over from Module 3, and Enterprise RAG's stages address them.
 2. Agentic RAG treats RAG as one tool an agent can choose to use. Four "agent ingredients" — Routing, One-Shot Query Planning, Tool Use, Conversation Memory — sit on the simple/cheap/low-latency end of a spectrum that runs up to "Full Agents" (ReAct, Dynamic Planning + Execution).
-3. Voice AI has two fundamental architectures: Speech-to-Speech (one hop, faster, less control) and Cascaded (STT -> LLM -> TTS, three hops, more control, more latency). Which one wins on cost and latency depends on the provider, not the architecture alone.
-4. A voice stack has four layers (Transport/Media, Intelligence, Orchestration, and optional Reasoning). Frameworks split into Model-Agnostic Orchestrators (LiveKit Agents, Pipecat) and Full-Stack Managed Platforms (ElevenLabs, Vapi), trading control for speed of setup.
-5. RAG evaluation's Five Pillars pyramid groups into three domains; this module's Appendix goes deep on Domain 2, The RAG Engine: Level 3 Retrieval Evals (relevance, recall, precision; BEIR/MS MARCO/NQ; NDCG@k, Recall@k, Precision@k, MRR) and Level 4 Generation Evals (faithfulness, groundedness, hallucination rate, completeness).
+3. Evaluation answers the question building leaves open: does it work? The Five Pillars pyramid groups five levels into three domains, and this module goes deep on Domain 2, The RAG Engine: Level 3 Retrieval Evals (relevance, recall, precision; BEIR/MS MARCO/NQ; NDCG@k, Recall@k, Precision@k, MRR) and Level 4 Generation Evals (faithfulness, groundedness, hallucination rate, completeness).
+4. The two halves of a RAG answer fail independently, so diagnosis has an order: check whether the right material was retrieved before asking whether the model used it faithfully.
 
 ## Where to next
 
-Do `exercises.md` for hands-on practice with agentic RAG design and voice architecture selection. Or ask to be quizzed (`quiz.md`). Week 5 covers **Voice Agents & Conversational Interfaces** in more depth, building on the S2S/Cascaded architecture choice and framework landscape introduced here.
+Do `exercises.md` for hands-on practice with agentic RAG design and evaluation diagnosis, including computing the retrieval metrics by hand. Or ask to be quizzed (`quiz.md`). For the fuller treatment of both evaluation levels, including the worked metric example and how the agent ingredients shift where failures originate, see `../reference/rag-evaluation.md`.
