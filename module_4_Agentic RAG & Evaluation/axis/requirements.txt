@@ -1,0 +1,25 @@
+# What the Vercel function installs. Mirrors `pyproject.toml` minus two things.
+#
+# **No chromadb.** It pulls onnxruntime, kubernetes and opentelemetry behind it —
+# 533MB of site-packages against Vercel's 250MB unzipped function limit, so the
+# bundle simply would not deploy. It is not needed: `_build_vector_store` returns
+# `InMemoryVectorStore` when the database path is `:memory:`, and `import chromadb`
+# sits inside `ChromaVectorStore.__init__` rather than at module scope, so the
+# Chroma path is never reached and never imported. See `api/index.py`.
+#
+# **No uvicorn.** Vercel supplies the server and imports the ASGI app directly.
+#
+# Local development still installs from `pyproject.toml`:
+#   pip install -e ".[dev,vector,parsers]"
+fastapi>=0.115
+pydantic>=2.7
+pydantic-settings>=2.3
+jinja2>=3.1
+httpx>=0.27
+python-multipart>=0.0.9
+pypdf>=4.2
+python-pptx>=0.6.23
+python-docx>=1.1
+openpyxl>=3.1
+Pillow>=10.3
+PyYAML>=6.0

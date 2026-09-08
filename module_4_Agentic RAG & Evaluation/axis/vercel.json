@@ -1,0 +1,9 @@
+{
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 300,
+      "includeFiles": "{ai_backend/**,backend/**,frontend/**,axis/**,data/**}"
+    }
+  },
+  "routes": [{ "src": "/(.*)", "dest": "api/index.py" }]
+}

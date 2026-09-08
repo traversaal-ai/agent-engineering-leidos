@@ -1,0 +1,25 @@
+# The function bundle is chosen by `includeFiles` in vercel.json; this keeps the
+# *upload* small and, more importantly, keeps two things off Vercel entirely.
+#
+# `var/` is the local SQLite database and Chroma index — a session's documents and
+# every step of its trace. It has no business leaving this machine, and the
+# deployment does not read it: `api/index.py` runs on `:memory:`.
+var/
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+tests/
+reference/
+docs/
+
+# **Kept out so `requirements.txt` is the one that is read.** Vercel's Python
+# runtime prefers `pyproject.toml` when both are present, and it installs only
+# `[project] dependencies` from it — the `parsers` and `vector` extras are optional
+# by design, so the bundle came up without openpyxl, pypdf and the rest, and
+# `load_golden_set()` died on `from openpyxl import Workbook` the first time the
+# Why-agentic page asked for the pain points. Locally nothing changes: development
+# still installs `pip install -e ".[dev,vector,parsers]"` from this file.
+pyproject.toml

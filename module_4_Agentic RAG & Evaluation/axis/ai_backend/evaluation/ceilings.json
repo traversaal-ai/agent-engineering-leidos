@@ -1,12 +1,12 @@
 {
-  "measured_at": "2026-09-07T12:11:50+00:00",
+  "measured_at": "2026-09-08T08:04:21+00:00",
   "conditions": {
     "embedding_provider": "openai",
     "embedding_model": "text-embedding-3-small",
     "top_k": 5,
     "min_similarity": 0.25,
     "hybrid": false,
-    "corpus": "ca6a18f2f7b3ea5c61ad4bb3b0658d23fdfa72ba677a463b68ff938d0847dee3"
+    "corpus": "22d9ff27b58a37d3b90ac36fc976c9481dd3a8590c71959f09b880bfbda65761"
   },
   "ceilings": {
     "decomposition": {
