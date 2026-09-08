@@ -1,0 +1,67 @@
+{# Every run in the session, newest first, as a picker.
+
+   The page used to show the last run and nothing else, so it could answer "what did that
+   just do?" and not "what did it do differently last time?" — which is the comparison a
+   student actually makes, and the reason the raw trace is kept at all.
+
+   Plain links. `axis.js` does not run on this page (it needs a canvas and an ask form),
+   so this is the only mechanism rather than a fallback — which is a good discipline: a
+   picker that needed a script would be dead here and nobody would notice, exactly as the
+   narration control was.
+
+   Expects `traces` (from `_traces`) and `selected_trace`. #}
+
+<aside class="tracelist" aria-label="Runs in this session">
+  <p class="eyebrow eyebrow--accent">
+    {{ traces | length }} run{{ '' if traces | length == 1 else 's' }} this session
+  </p>
+
+  {% if traces %}
+  <ol class="tracelist__items">
+    {% for run in traces %}
+    {# `data-strategy` carries the run's identity colour, resolved from one variable the
+       way the canvas and the comparison table already do — so a naive run and an agentic
+       one are told apart at a glance rather than by reading. Absent on indexing and
+       summaries, which have no strategy and should not borrow one. #}
+    <li>
+      <a class="tracerun"
+         href="/trace?id={{ run.id }}"
+         data-kind="{{ run.kind }}"
+         {% if run.strategy %}data-strategy="{{ run.strategy }}"{% endif %}
+         {% if run.status != 'ok' %}data-status="{{ run.status }}"{% endif %}
+         {% if run.id == selected_trace %}aria-current="true"{% endif %}>
+        <span class="tracerun__head">
+          <span class="tracerun__kind">
+            {%- if run.kind == 'index' -%}indexed
+            {%- elif run.kind == 'summary' -%}overview
+            {%- else -%}{{ (run.strategy or 'query') | replace('_', ' ') }}
+            {%- endif -%}
+          </span>
+          <span class="tracerun__when" title="{{ run.at | e }}">{{ run.when }}</span>
+        </span>
+
+        <span class="tracerun__title">{{ run.title | e }}</span>
+
+        <span class="tracerun__metrics">
+          {{ run.steps }} step{{ '' if run.steps == 1 else 's' }}
+          {#- A run that spent nothing says so rather than showing `$0.00000`, which
+              reads as a measurement of zero rather than as no external call. -#}
+          {%- if run.cost_usd >= 0.000005 %}
+          &middot; <span class="money">${{ '%.5f' | format(run.cost_usd) }}</span>
+          {%- elif run.cost_usd %}
+          &middot; <span class="money">${{ '%.8f' | format(run.cost_usd) }}</span>
+          {%- endif %}
+          {%- if run.status == 'running' %} &middot; running…
+          {%- elif run.status != 'ok' %} &middot; {{ run.status | replace('_', ' ') }}
+          {%- endif %}
+        </span>
+      </a>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="muted">
+    Nothing has run yet. Index a document or ask a question and it appears here.
+  </p>
+  {% endif %}
+</aside>

@@ -1,0 +1,42 @@
+/* Inter, in three weights. OFL, so safe to commit — the same licence reasoning
+ * that rules out AGPL parsers elsewhere in the project.
+ *
+ * One family rather than the display-serif-plus-mono pair this replaced, because
+ * the palette and type now match `reference/module_3_Enterprise RAG/`, which is
+ * Inter throughout and distinguishes headings by weight and negative tracking
+ * instead of by a second face. Three files where there were three, and the mono
+ * stack is now purely system, so nothing is downloaded for it at all.
+ *
+ * This file is linked by `base.html` **only when the woff2 files are on disk**
+ * (`fonts_available`, from `_vendored(_FONT_FILES)` in frontend/app.py). They are
+ * not committed, so on a fresh checkout it is never requested and no 404 appears
+ * in the log.
+ *
+ * `font-display: swap` is still correct even so: it covers the window while a
+ * present file downloads, and the case where one of the three is missing while the
+ * others are not.
+ *
+ * The font stacks themselves live in app.css and always name a real system
+ * fallback, so the page is composed with none of these installed. See VENDOR.md
+ * for the download commands. */
+@font-face {
+  font-family: "Inter";
+  src: url("/static/fonts/Inter-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/static/fonts/Inter-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/static/fonts/Inter-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}

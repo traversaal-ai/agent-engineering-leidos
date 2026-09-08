@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Summarize &middot; Axis{% endblock %}
+
+{# Summarizer mode: choose documents, read them in full, combine.
+
+   A page beside Run, Compare and Trace rather than a button in the rail. Two reasons.
+   It is the most expensive action Axis offers and it had no choice and no confirmation —
+   one click read every document a student had uploaded. And its result was reachable
+   only by pressing that button again, so looking at the trace to see the map-reduce
+   steps meant losing the summary you went there to explain.
+
+   The teaching reason is the stronger one: summarizing is the *contrast* that justifies
+   retrieval. Read everything, or read the relevant part. Picking documents makes that
+   measurable rather than asserted — summarize one, then four, and the cost moves with
+   the corpus in a way asking a question never does. #}
+
+{% block content %}
+<div class="page">
+  <header class="page__head">
+    <h1 class="page__title">Summarize documents</h1>
+    <p class="page__lede">
+      Every document you pick, read in full and combined. Nothing is retrieved and
+      nothing is scored &mdash; which is why this costs more the more you pick, and
+      asking a question does not.
+    </p>
+  </header>
+
+  {% if documents %}
+  {# A plain form: checkboxes and a submit. Nothing here depends on a script, which is
+     the hard requirement in CLAUDE.md and also the honest choice — the one control that
+     spends money should not need JavaScript to work.
+
+     Ready documents are pre-checked, which is what the rail's button did implicitly.
+     One that failed to index is shown and disabled rather than hidden: a student
+     uploaded it and would otherwise be left wondering where it went, and it has no
+     chunks to read. #}
+  {# The most expensive action Axis offers — one LLM call per document plus one to
+     combine — and its spinner sat in the markup with nothing to turn it on. #}
+  <form class="summarizer" action="/summarize" method="post"
+        data-busy-label="Summarizing">
+    <p class="eyebrow eyebrow--accent">Documents to read</p>
+
+    <div class="docpicker">
+      {# `document_id` is `None` for a file that never reached the index, so a document
+         is readable only if it is ready *and* has one. #}
+      {% for doc in documents %}
+      {% set readable = doc.status == 'ready' and doc.document_id %}
+      <label class="docpick {{ '' if readable else 'docpick--off' }}">
+        <input type="checkbox" name="documents" value="{{ doc.document_id or '' }}"
+               {% if not readable %}disabled
+               {% elif doc.document_id in selected_documents %}checked{% endif %}>
+        <span class="docpick__name">{{ doc.filename | e }}</span>
+        {% if readable %}
+        <span class="docpick__meta">{{ doc.chunk_count }} chunk{{ '' if doc.chunk_count == 1 else 's' }}</span>
+        {% else %}
+        <span class="docpick__meta docpick__meta--bad">
+          {{ doc.error | e if doc.error else 'not indexed' }}
+        </span>
+        {% endif %}
+      </label>
+      {% endfor %}
+    </div>
+
+    <button type="submit" class="button--small">
+      <span class="button__label">Summarize documents</span>
+      <span class="spinner" aria-hidden="true"></span>
+    </button>
+  </form>
+  {% else %}
+  {# The rail *does* render here now, and its Documents group carries an upload — so
+     this could point at it. It points at the Run page anyway: uploading is only half of
+     what is missing, and the other half is watching the document become vectors, which
+     is the thing the Run page exists to show. It also names where the empty corpus can
+     be swapped for the demo one. #}
+  <p class="empty">
+    Nothing to summarize in this corpus yet. Upload a document from the sidebar or on the
+    <a href="/">Run</a> page &mdash; or switch corpus above, if the other one has
+    something in it.
+  </p>
+  {% endif %}
+
+  {% if summary %}
+  {# What it cost, next to what it produced. The lede claims summarizing scales with the
+     corpus; this is the claim measured, and it is the number to run twice in front of a
+     class — once over one document, once over four. #}
+  <div class="summary__head">
+    <span class="chip">{{ summary.documents }} document{{ '' if summary.documents == 1 else 's' }} read</span>
+    <span class="chip">${{ '%.6f' | format(summary.cost_usd) }}</span>
+    <span class="chip">{{ summary.prompt_tokens }}&rarr;{{ summary.completion_tokens }} tokens</span>
+    <span class="muted">
+      one call per document, then one that joins them &mdash; see
+      <a href="/trace">the trace</a>
+    </span>
+  </div>
+
+  <div class="card">
+    <div class="answer__text">{{ summary.summary | e }}</div>
+    {% if summary.citations %}
+    <ol class="citations">
+      {% for citation in summary.citations %}
+      <li data-kind="{{ citation.kind | default('document') }}">
+        <div class="citations__head">
+          <span class="citations__n">[{{ loop.index }}]</span>
+          <span class="citations__file">{{ citation.filename | e }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

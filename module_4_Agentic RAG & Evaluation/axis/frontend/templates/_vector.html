@@ -1,0 +1,59 @@
+{# One text and the vector it became. Expects `s` — a sample dict carrying `text`,
+   `vector_head`, `vector_strip`, `dimensions`, `nonzero`, `notable`.
+
+   Shared by the embed stage and the retrieve stage's query vector, because the two
+   are the same event and showing them identically is the point: a chunk and a
+   question are turned into numbers of the same width by the same model, and
+   similarity search is only meaningful because of that. Two different-looking panes
+   would have quietly undermined it. #}
+
+<figure class="vector">
+  {% if s.get('text') %}
+  <figcaption class="vector__text">
+    {% if s.get('location') %}<span class="blocks__where">{{ s.get('location') | e }}</span>{% endif %}
+    {{ s.get('text') | e }}
+  </figcaption>
+  {% endif %}
+
+  <p class="vector__arrow" aria-hidden="true">&darr;</p>
+
+  {# The first few numbers, read left to right. Honest about being the first few
+     rather than a selection — the strongest dimensions are shown separately below,
+     labelled as such. #}
+  <p class="vector__head">
+    <span class="vector__bracket">[</span>{% for v in s.get('vector_head') or [] %}<span
+      class="vector__n" data-sign="{{ 'neg' if v < 0 else 'pos' }}">{{ '%.4f' | format(v) }}</span>{{ ',' if not loop.last }}{% endfor %}<span
+      class="vector__bracket">, &hellip; ]</span>
+  </p>
+
+  <p class="vector__dims">
+    {{ s.get('dimensions', 0) }} dimensions
+    {%- if s.get('nonzero') is not none %} &middot; {{ s.get('nonzero') }} carrying a value{% endif %}
+  </p>
+
+  {# A bar per dimension. The numbers are exact and the shape is instant, and the
+     shape is what lets two vectors be told apart from the back of a room. #}
+  {% if s.get('vector_strip') %}
+  <p class="vector__strip" aria-hidden="true">
+    {% for v in s.get('vector_strip') %}<span class="vector__bar"
+      data-sign="{{ 'neg' if v < 0 else 'pos' }}"
+      style="--v: {{ '%.4f' | format(v if v >= 0 else -v) }}"></span>{% endfor %}
+  </p>
+  {% endif %}
+
+  {# Where the signal actually is.
+
+     Not decoration: without it the offline demo shows nothing. The head is genuinely
+     the first eight numbers, which reads well for a dense vector from OpenAI or
+     Ollama. The offline stand-in is a hashed bag of words over 4,096 dimensions, so
+     roughly twenty-five are set and the first eight are reliably all zero — for every
+     chunk and for the question too. A class running offline would watch two different
+     texts produce identical vectors and reasonably conclude it was broken. #}
+  {% if s.get('notable') %}
+  <p class="vector__notable">
+    strongest:
+    {% for n in s.get('notable') %}<span class="vector__dim">#{{ n.get('i') }}</span><span
+      class="vector__n" data-sign="{{ 'neg' if n.get('v', 0) < 0 else 'pos' }}">{{ '%.3f' | format(n.get('v', 0)) }}</span>{% endfor %}
+  </p>
+  {% endif %}
+</figure>

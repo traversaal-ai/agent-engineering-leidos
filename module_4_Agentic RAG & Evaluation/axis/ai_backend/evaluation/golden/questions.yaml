@@ -1,0 +1,375 @@
+# Golden Q&A set, version 2 — the ACME corpus.
+#
+# ── The corpus ─────────────────────────────────────────────────────────────────
+# The five documents live in `data/` at the repo root — see `data/README.md`. Copied
+# from `reference/module_3_Enterprise RAG/data/`, the material this cohort was already
+# taught on; that folder is the record of the demo they saw and is never read at
+# runtime. Version 1 asked about a synthetic staff handbook and security policy, which
+# nobody had read and which had no relationships in it.
+#
+# This file is the ground truth *about* those documents, which is why it stays here
+# beside the harness while the corpus does not. Editing a document in `data/` can
+# invalidate an expectation below, and `--compare-strategies` is what says so.
+#
+# Two things that corpus could not do, and this one can:
+#
+#   * The documents **interlock**. The register's highest-exposure risk blocks an
+#     analysis that feeds a deliverable named only in the SOW; the same slipped
+#     item is an action in the kickoff notes and an escalation in the status
+#     review. So a question can genuinely require using what one document says to
+#     know what to look for in another — which no amount of prompt engineering
+#     fakes.
+#   * It is **contract prose**, so exact identifiers are everywhere (MSA-2026-0417,
+#     SOW-003, R-02, CPFF, Severity 1). Those are where dense retrieval is weakest
+#     and BM25 strongest, so the hybrid arm has something real to earn.
+#
+# ── Composition, and why ───────────────────────────────────────────────────────
+# System Design Section 12 asks for coverage per document type. Four properties of
+# this set are deliberate:
+#
+#   * `unanswerable` questions are included, and there are four of them. The
+#     ungrounded path is a *requirement* (PRD Section 6: "the answer states that
+#     explicitly instead of fabricating a citation"), so a set of only answerable
+#     questions would leave the most dangerous failure mode unmeasured. See the
+#     note above them about the adjacent case, which this corpus cannot measure
+#     offline.
+#   * `lexical` questions ask for exact identifiers. One of them — `retainage` —
+#     is in the set *because dense retrieval fails it*, so hybrid's advantage is a
+#     measured delta rather than a claim.
+#   * `tabular` and `visual` questions are answered by the generated `rates.xlsx`
+#     and `headcount.png`, which are in the harness corpus and not in the
+#     one-click demo set (`golden.py`: `load_documents` vs `demo_documents`).
+#   * **Four questions carry a pain-point ground truth.** These are the set's
+#     newest and most load-bearing job — see the block before them.
+#
+# ── Every question here was chosen by measurement ──────────────────────────────
+# Not by intuition, and the difference showed up immediately: of the first batch
+# of candidate wordings a third retrieved the wrong document or nothing at all,
+# and one relational candidate already scored 1.00 on the whole question — it
+# would have sat in the set looking like evidence for decomposition while
+# contributing none. Every question below was scored against the corpus in both
+# retrieval modes before being kept, and the figures the ceilings depend on are
+# recorded beside the questions that produce them.
+#
+# ── Schema ─────────────────────────────────────────────────────────────────────
+#   id                 stable identifier; results are keyed on it across runs
+#   question           exactly what gets asked
+#   kind               factual | lexical | relational | tabular | visual |
+#                      summarization | comparison | multi_hop | conversational |
+#                      unanswerable
+#   expect_documents   which fixtures should be retrieved (empty = none should)
+#   expect_contains    substrings a correct answer must include (case-insensitive)
+#   expect_grounded    whether an answer should be grounded in the documents
+#   sub_questions      optional; the hand-authored decomposition a working router
+#                      should produce. Drives the decomposition ceiling.
+#   hops               optional; the ordered chain a working agent should follow,
+#                      where each step is knowable only from the previous one's
+#                      result. Drives the hop ceiling. NOT interchangeable with
+#                      sub_questions — see `deliverable-at-risk`.
+#   context_question   optional; the turn that must precede `question` for it to
+#                      mean anything. Drives the resolution ceiling.
+#   resolved           optional; `question` with its references resolved, as a
+#                      working rewriter should produce it.
+#   expect_full_coverage  optional; this question is about the whole of its
+#                      documents rather than a passage in them. Drives the
+#                      coverage ceiling.
+
+questions:
+  # ── Straightforward factual recall ────────────────────────────────────────
+  - id: payment-terms
+    question: When is payment due on a correct invoice?
+    kind: factual
+    expect_documents: [acme-msa-2026]
+    expect_contains: ["Net 45"]
+    expect_grounded: true
+
+  - id: peak-staffing
+    question: What is peak staffing, and when is it reached?
+    kind: factual
+    expect_documents: [acme-sow-003-sentinel]
+    expect_contains: ["34"]
+    expect_grounded: true
+
+  - id: termination-notice
+    question: What notice is required for termination for convenience?
+    kind: factual
+    expect_documents: [acme-msa-2026]
+    expect_contains: ["sixty"]
+    expect_grounded: true
+
+  - id: nte-value
+    question: What is the not-to-exceed value of SOW-003?
+    kind: factual
+    expect_documents: [acme-sow-003-sentinel]
+    expect_contains: ["13,268,000"]
+    expect_grounded: true
+
+  # ── Exact identifiers: dense embeddings' weak spot ────────────────────────
+  - id: msa-number
+    question: What is the agreement number of the master services agreement?
+    kind: lexical
+    expect_documents: [acme-msa-2026]
+    expect_contains: ["MSA-2026-0417"]
+    expect_grounded: true
+
+  - id: r02-owner
+    question: Who is the owner of risk R-02, the reference scenario set delivery delay?
+    kind: lexical
+    expect_documents: [acme-risk-register]
+    expect_contains: ["Dana Whitfield"]
+    expect_grounded: true
+
+  - id: sev1-response
+    question: What is the response time and restoration target for Severity 1?
+    kind: lexical
+    expect_documents: [acme-msa-2026]
+    expect_contains: ["1 hour"]
+    expect_grounded: true
+
+  # This is where hybrid retrieval earns its place, and it is the only question
+  # in the set chosen *because* dense fails it. Measured: the offline dense arm
+  # finds nothing at all and the keyword arm returns the right document.
+  # "Retainage" appears in one clause of one document and nowhere else in the
+  # corpus, which is exactly the shape BM25's term weighting is good at and a
+  # bag-of-words embedding is not.
+  - id: retainage
+    question: What percentage is withheld as retainage on each milestone?
+    kind: lexical
+    expect_documents: [acme-msa-2026]
+    expect_contains: ["five percent"]
+    expect_grounded: true
+
+  # ── Tabular and visual modalities (Section 12) ────────────────────────────
+  # Answered by the generated fixtures, which are in the harness corpus only:
+  # `load_documents()` has them, `demo_documents()` does not.
+  - id: rate-band-senior
+    question: What is the daily rate for the senior band?
+    kind: tabular
+    expect_documents: [rates]
+    expect_contains: ["950"]
+    expect_grounded: true
+
+  - id: chart-headcount
+    question: What does the headcount chart show for the platform team?
+    kind: visual
+    expect_documents: [headcount]
+    expect_contains: []
+    expect_grounded: true
+
+  # ── Relational: spans two documents, and splitting is what finds both ─────
+  #
+  #    These carry `sub_questions`: the hand-authored decomposition a working
+  #    router should produce. Retrieving over them instead of over the whole
+  #    question is the *decomposition ceiling* — the agentic win with the model's
+  #    ability to split the question held out, so it is measurable offline where
+  #    a fake LLM cannot decompose at all. See System Design Section 12.
+  #
+  #    Both were chosen by measurement, and measured in **both** retrieval modes.
+  #    That second part caught a mistake worth recording: a candidate about the
+  #    August review scored 0.50 whole against 1.00 split under dense and looked
+  #    like a good demonstrator, but scored 1.00 whole under hybrid — where the
+  #    keyword arm finds both documents on its own. It would have sat in the set
+  #    contributing nothing on the stronger arm, and the gate below (which runs
+  #    hybrid deliberately, as the harder assertion) would have failed on it.
+  - id: gfe-delay-remedy
+    question: >-
+      What is the contractor entitled to if furnished equipment arrives more
+      than thirty days late, and how is it granted?
+    kind: relational
+    expect_documents: [acme-sow-003-sentinel, acme-msa-2026]
+    expect_contains: ["CCN"]
+    expect_grounded: true
+    sub_questions:
+      - How late must government furnished equipment be to be an excusable delay?
+      - What written instrument authorizes a change to schedule or price?
+    # One fact per side — the two the answer cannot be assembled without. See the
+    # note above `expect_passages` in golden.py for why these are separate from
+    # `expect_contains`, and why document recall could not see the difference.
+    expect_passages:
+      - "Late delivery of GFE beyond thirty (30) days"
+      - "Notice (CCN) signed by both parties"
+
+  # Measured: whole question 0.00 against 1.00 split, in both modes. The strongest
+  # demonstrator in the set — a question naming two things in two documents
+  # retrieves neither above threshold when embedded whole.
+  - id: key-personnel-risk-owner
+    question: >-
+      Who are the designated key personnel, and which of them owns the reference
+      scenario set risk?
+    kind: relational
+    expect_documents: [acme-msa-2026, acme-risk-register]
+    expect_contains: ["Dana Whitfield"]
+    expect_grounded: true
+    sub_questions:
+      - Who are the designated key personnel under the master agreement?
+      - Who owns risk R-02, the reference scenario set delivery delay?
+    # **Not "Dana Whitfield" for either side**, though she is the answer to both. Her
+    # name appears in four of the five documents, so it identifies nothing — retrieval
+    # could reach it without ever seeing the personnel table or the R-02 entry. Each
+    # side is pinned to the passage that actually carries its half.
+    expect_passages:
+      - "designated Key Personnel"
+      - "**Owner:** Dana Whitfield"
+
+  # ── The four pain points of naive RAG ─────────────────────────────────────
+  #
+  # `reference/module_3_Enterprise RAG/learning-materials/reference/enterprise-rag.md`
+  # names four specific failures of naive retrieval and then hands one of them
+  # forward: *"is there one pain point that this architecture only partially
+  # fixes, one that would still benefit from an agent actively deciding to
+  # retrieve again based on what it just found?"* Axis is the class that answers
+  # that question, so these four are the syllabus.
+  #
+  # Each is answered by a **different** mechanism, and each carries the ground
+  # truth for a ceiling that measures that mechanism offline — with the model's
+  # ability to perform it held out, which is the only way any of it is visible
+  # against the fake providers. A student is shown a prediction only where the
+  # harness verifies it.
+
+  # 1. "Retrieval returns chunks, not the whole picture."
+  #    Answered by Summarize, which reads every chunk. Measured by the coverage
+  #    ceiling: how many chunks top-k can reach against how many exist. Document
+  #    *recall* is blind to this — one chunk of five scores 1.00 — which is why
+  #    it needed a score of its own rather than another recall row.
+  - id: summarize-program
+    question: Summarize the Sentinel Ground Radar Modernization program.
+    kind: summarization
+    expect_documents:
+      - acme-msa-2026
+      - acme-sow-003-sentinel
+      - acme-risk-register
+      - meeting-notes-2026-07-14-kickoff
+      - meeting-notes-2026-08-11-status
+    expect_contains: ["Sentinel"]
+    expect_grounded: true
+    expect_full_coverage: true
+
+  # 2. "Comparison ... gets embedded as one single vector and searched once."
+  #    Answered by the decomposer. Two independent lookups, neither depending on
+  #    the other — which is exactly what distinguishes it from the multi-hop
+  #    question below.
+  #
+  #    Measured: the whole question retrieves **nothing at all** offline. The
+  #    blended embedding of a two-part comparison lands between both documents
+  #    and clears the threshold against neither, while each half scores 1.00.
+  #    That is the pain point in one number.
+  - id: ceiling-vs-nte
+    question: >-
+      Compare the master agreement's overall ceiling with SOW-003's
+      not-to-exceed value, and say which one limits spending on this program.
+    kind: comparison
+    expect_documents: [acme-msa-2026, acme-sow-003-sentinel]
+    expect_contains: ["13,268,000"]
+    expect_grounded: true
+    sub_questions:
+      - What is the aggregate ceiling across all SOWs in the master agreement?
+      - What is the not-to-exceed value of SOW-003?
+    # The two figures being compared. A comparison that reached only one of them is
+    # not a comparison, and document recall scored it a perfect 1.00 all the same.
+    expect_passages:
+      - "$48,500,000"
+      - "$13,268,000"
+
+  # 3. "Implicit data ... no mechanism for chaining a second retrieval based on
+  #    what the first one found."
+  #    Answered by the router's DEPTH decision plus the ReAct loop's hop mode.
+  #
+  #    `hops` rather than `sub_questions`, and the difference is the whole
+  #    lesson: you cannot ask the second question until the first is answered.
+  #    Nothing in this question's wording contains "Preliminary Design Review" —
+  #    the register is what tells you that is the thing to look for. A decomposer
+  #    handed this question can only split it into parts it can see, and the part
+  #    that matters is not visible yet.
+  #
+  #    Measured: whole question 0.00, the hop chain 1.00.
+  - id: deliverable-at-risk
+    question: >-
+      Which contract deliverable is put at risk by the program's
+      highest-exposure risk, and when is it due?
+    kind: multi_hop
+    expect_documents: [acme-risk-register, acme-sow-003-sentinel]
+    expect_contains: ["PDR"]
+    expect_grounded: true
+    hops:
+      - Which risk on the Sentinel program has the highest exposure, and what does it block?
+      - When is the Preliminary Design Review package due?
+    # One per hop, and in hop order. The second is the point of the whole question:
+    # nothing in the wording says "Preliminary Design Review", so retrieval can only
+    # reach it by having read the first.
+    expect_passages:
+      - "the highest exposure on the program"
+      - "Preliminary Design Review (PDR) package"
+
+  # 4. "No memory, disconnected dialogue."
+  #    Answered by conversation history plus the rewriter. Measured by the
+  #    resolution ceiling: retrieving for the follow-up as typed against
+  #    retrieving for it resolved.
+  #
+  #    "How long is it?" contains no content word at all — every term in it is
+  #    among the commonest in English, and the thing being asked about exists only
+  #    in the turn before. Measured: it retrieves **nothing** in either retrieval
+  #    mode, while the resolved form scores 1.00 in both. Resolving the pronoun is
+  #    what makes the question findable, and no amount of retrieval tuning
+  #    substitutes for it.
+  #
+  #    Chosen after a first attempt failed the gate: "Which agreement is it issued
+  #    under?" looked ideal and retrieved nothing under dense, but hybrid found the
+  #    right document anyway — "issued under" is a rare bigram appearing in the
+  #    SOW's own header, so BM25 had plenty to work with. Any follow-up carrying a
+  #    distinctive term is findable without being understood, which is a general
+  #    lesson about this pain point rather than a fact about one question.
+  - id: agreement-term
+    question: How long is it?
+    kind: conversational
+    expect_documents: [acme-msa-2026]
+    expect_contains: ["three"]
+    expect_grounded: true
+    context_question: When did the master services agreement take effect?
+    resolved: How long is the term of the master services agreement?
+
+  # ── Unanswerable: the ungrounded path must fire, not fabricate ────────────
+  #
+  # All four are off-topic for a program-contract corpus in a way the relevance
+  # threshold can see, and all four were checked to decline in *both* retrieval
+  # modes — a question that declines under dense and answers under hybrid would
+  # make the milestone gate depend on configuration.
+  #
+  # **The adjacent case is deliberately absent, and that is a limitation worth
+  # knowing.** Version 1 included one question sitting next to real content
+  # ("months of paid sabbatical", beside a leave policy) and it passed offline
+  # because retrieval returned nothing. On this corpus the equivalents do not:
+  # "What is the response time for a Severity 4 issue?" scores 0.319 against a
+  # section defining Severity 1, 2 and 3, and "What is the deployment schedule
+  # for Site 11?" scores 0.400 against a document that mentions Site 11 only to
+  # exclude it. Retrieval is *right* to return those passages — declining is the
+  # model's job, and the fake LLM cannot do it. So the hardest ungrounded case is
+  # measurable only on a real-provider run, which is the same boundary Section 12
+  # already records for answer content. Named here so it stays a known gap rather
+  # than something nobody thought of.
+  - id: unanswerable-pension
+    question: How much does ACME contribute to employee pensions each month?
+    kind: unanswerable
+    expect_documents: []
+    expect_contains: []
+    expect_grounded: false
+
+  - id: unanswerable-bonus
+    question: What is the annual bonus percentage for programme staff?
+    kind: unanswerable
+    expect_documents: []
+    expect_contains: []
+    expect_grounded: false
+
+  - id: unanswerable-share-price
+    question: What was ACME's share price at the end of the quarter?
+    kind: unanswerable
+    expect_documents: []
+    expect_contains: []
+    expect_grounded: false
+
+  - id: unanswerable-quantum
+    question: What is the program's position on quantum cryptography research?
+    kind: unanswerable
+    expect_documents: []
+    expect_contains: []
+    expect_grounded: false

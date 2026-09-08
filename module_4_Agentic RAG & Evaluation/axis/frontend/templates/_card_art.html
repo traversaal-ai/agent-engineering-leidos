@@ -1,0 +1,286 @@
+{# What a stage produced, drawn small enough to sit inside its card on the canvas.
+
+   **This is the point of the canvas.** A card that says "7 chunks" states an outcome; a
+   card that draws seven overlapping tiles shows the mechanism, and a student watching
+   from the back of a room has learned something without anyone clicking anything. Every
+   miniature here is built from the same attributes the expanded pane uses — there is no
+   second source of truth and no decoration standing in for data.
+
+   Each one degrades: with no step it draws nothing, and the card shows what the stage
+   *will* do instead. Expects `step`. #}
+
+{% set a = step.attributes or {} %}
+
+{# ── PARSE ─────────────────────────────────────────────────────────────────
+   A page with text on it. The location is kept because it is what a citation will
+   later point at — seeing it appear this early is what makes a citation traceable
+   rather than magic. #}
+{% if step.step_type == 'parse' %}
+  {% set b = (a.get('sample_blocks') or [{}])[0] %}
+  <div class="art art--parse">
+    <p class="art__page">{{ (b.get('preview') or '')[:160] | e }}</p>
+    <p class="art__foot">
+      {{ a.get('blocks', 0) }} block{{ '' if a.get('blocks') == 1 else 's' }}
+      {%- if a.get('block_kinds') %} &middot; {{ a.get('block_kinds') | join(', ') | e }}{% endif %}
+    </p>
+    {# What the parser could not read, on the card rather than behind a click.
+       A page with no text layer produces no chunk, no vector and no citation, so it is
+       invisible in every stage after this one — and a scan with a typed cover sheet
+       therefore indexed one page of twenty and drew a Parse card that looked normal.
+       The count is the only place the loss exists. #}
+    {# Short enough to fit the card at its narrowest — the card is ~11rem of art and
+       this line does not wrap, so a longer sentence is an ellipsis. The full
+       explanation is in the upload banner and in the opened card's raw attributes. #}
+    {% if a.get('unreadable_blocks') %}
+    <p class="art__warn">{{ a.get('unreadable_blocks') }} skipped &middot; needs OCR</p>
+    {% endif %}
+  </div>
+
+{# ── CHUNK ─────────────────────────────────────────────────────────────────
+   Tiles that physically overlap, each shifted left by the fraction of itself it
+   shares with the one before. The shaded band is that shared text. Drawn from the
+   chunker's own `_overlap`, so a corpus whose sections all fit in one chunk honestly
+   shows tiles that do not overlap — which is a true thing about that corpus. #}
+{% elif step.step_type == 'chunk' %}
+  <div class="art art--chunk">
+    <div class="tiles">
+      {% for c in (a.get('chunks') or [])[:4] %}
+      {% set shared = (c.get('overlap_with_previous') or '') | length %}
+      {% set chars = c.get('chars') or 1 %}
+      <span class="tile" style="--lap: {{ '%.3f' | format([shared / chars, 0.45] | min) }}"></span>
+      {% endfor %}
+    </div>
+    <p class="art__foot">
+      {{ a.get('chunk_count', 0) }} chunk{{ '' if a.get('chunk_count') == 1 else 's' }}
+      &middot; {{ a.get('overlap_chars', 0) }} overlap
+    </p>
+  </div>
+
+{# ── EMBED ─────────────────────────────────────────────────────────────────
+   The text above the numbers it became. Same bar strip the expanded pane uses, at
+   card size — the shape is what tells two vectors apart from a distance, which is
+   the whole reason the strip exists rather than a row of figures. #}
+{% elif step.step_type == 'embed' %}
+  {% set s = (a.get('samples') or [{}])[0] %}
+  <div class="art art--embed">
+    {% if s.get('text') %}
+    <p class="art__quote">{{ (s.get('text') or '')[:70] | e }}</p>
+    {% endif %}
+    {% if s.get('vector_strip') %}
+    <p class="strip" aria-hidden="true">
+      {%- for v in s.get('vector_strip') -%}<span class="strip__bar"
+        data-sign="{{ 'neg' if v < 0 else 'pos' }}"
+        style="--v: {{ '%.4f' | format(v if v >= 0 else -v) }}"></span>{%- endfor -%}
+    </p>
+    {% endif %}
+    <p class="art__foot">
+      {{ a.get('dimensions', 0) }} dimensions
+      {%- if s.get('nonzero') is not none %} &middot; {{ s.get('nonzero') }} set{% endif %}
+    </p>
+  </div>
+
+{# ── STORE ─────────────────────────────────────────────────────────────────
+   A dot per vector the index holds, with this document's own marked. Watching the
+   grid grow across three uploads is what makes "the index" a thing rather than a
+   word. #}
+{% elif step.step_type == 'store' %}
+  {% set total = a.get('total_in_index', 0) %}
+  {% set written = a.get('written', 0) %}
+  <div class="art art--store">
+    <p class="dots" aria-hidden="true">
+      {%- for i in range([total, 48] | min) -%}
+      <span class="dots__d" {% if i >= [total, 48] | min - written %}data-new="true"{% endif %}></span>
+      {%- endfor -%}
+    </p>
+    <p class="art__foot">
+      {{ written }} written &middot; the index holds {{ total }}
+    </p>
+  </div>
+
+{# ── REWRITE ───────────────────────────────────────────────────────────────
+   The question as typed, struck through, above the question actually searched for.
+   Two lines is the whole stage, and it has to be two lines: a card reporting
+   "rewritten: true" would state an outcome where the mechanism *is* the before and
+   after. When nothing needed changing it says so rather than drawing one string
+   twice, which would look like a bug. #}
+{% elif step.step_type == 'rewrite' %}
+  <div class="art art--rewrite" data-changed="{{ 'true' if a.get('changed') else 'false' }}">
+    {% if a.get('changed') %}
+    <p class="rewrite__was">{{ (a.get('original') or '')[:80] | e }}</p>
+    <p class="rewrite__now">{{ (a.get('rewritten') or '')[:80] | e }}</p>
+    {% else %}
+    <p class="rewrite__now">{{ (a.get('original') or '')[:80] | e }}</p>
+    <p class="rewrite__same">already a standalone query</p>
+    {% endif %}
+    <p class="art__foot">
+      {%- if a.get('history_turns') %}
+      resolved against {{ a.get('history_turns') }} earlier turn{{ '' if a.get('history_turns') == 1 else 's' }}
+      {%- elif a.get('llm_called') is false %}
+      rewriting is off
+      {%- elif a.get('implausible') %}
+      discarded &middot; did not resemble the question
+      {%- else %}
+      no conversation to resolve against
+      {%- endif -%}
+    </p>
+  </div>
+
+{# ── ROUTE ─────────────────────────────────────────────────────────────────
+   The three decisions, as three chips. This is the entire orchestration difference
+   at card size: naive RAG has no card here at all. #}
+{% elif step.step_type == 'route' %}
+  <div class="art art--route">
+    <p class="decisions">
+      <span class="decision" data-on="true">{{ a.get('source', 'documents') | e }}</span>
+      <span class="decision" data-on="{{ 'true' if a.get('needs_decomposition') else 'false' }}">
+        {{ 'split it' if a.get('needs_decomposition') else 'one lookup' }}
+      </span>
+      {# Only when it fired. A permanent "single hop" chip would spend a third of the
+         card restating the ordinary case, and the interesting thing about depth is
+         the rare answer rather than the common one. #}
+      {% if a.get('multi_hop') %}
+      <span class="decision" data-on="true">multi-hop</span>
+      {% endif %}
+    </p>
+    <p class="art__foot">
+      confidence {{ '%.2f' | format(a.get('confidence', 0)) }}
+      {%- if a.get('fallback_taken') %} &middot; fell back{% endif %}
+    </p>
+  </div>
+
+{# ── DECOMPOSE ─────────────────────────────────────────────────────────────  #}
+{% elif step.step_type == 'decompose' %}
+  {% set subs = a.get('sub_questions_text') or [] %}
+  <div class="art art--decompose">
+    <ol class="subs">
+      {% for sub in subs[:3] %}
+      <li>{{ sub[:64] | e }}</li>
+      {% endfor %}
+    </ol>
+    <p class="art__foot">
+      {{ a.get('sub_questions', 1) }} sub-question{{ '' if a.get('sub_questions', 1) == 1 else 's' }}
+      {%- if a.get('llm_called') is false %} &middot; not split{% endif %}
+    </p>
+  </div>
+
+{# ── RETRIEVE ──────────────────────────────────────────────────────────────
+   The strongest thing on the canvas, and the one that has to read at card size: every
+   candidate scored, ranked, and the line drawn across them. Nothing else here shows a
+   decision being made rather than reported. #}
+{% elif step.step_type == 'retrieve' %}
+  {% set candidates = a.get('candidates') or [] %}
+  {% set threshold = a.get('threshold', 0) %}
+  <div class="art art--search">
+    {# The question's own vector is *not* drawn here, and the omission is a choice
+       rather than an oversight: at card height the strip and the ranked list cannot
+       both be legible, and between "the question became numbers" — which the Embed
+       card up in the indexing track already shows, in the same visual language — and
+       "here is the line that was drawn", the second is the one nothing else says.
+       The opened card leads with the query vector. #}
+    {% if candidates %}
+    <ol class="ranks">
+      {% set ns = namespace(drawn=false) %}
+      {% for c in candidates[:5] %}
+      {% if not c.get('kept') and not ns.drawn %}
+      {% set ns.drawn = true %}
+      <li class="ranks__line"><span>{{ '%.2f' | format(threshold) }}</span></li>
+      {% endif %}
+      <li class="ranks__item" data-kept="{{ 'yes' if c.get('kept') else 'no' }}">
+        <span class="ranks__bar" style="--score: {{ '%.3f' | format(c.get('score', 0)) }}"></span>
+        <span class="ranks__score">{{ '%.2f' | format(c.get('score', 0)) }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+
+    <p class="art__foot">
+      {{ a.get('chunks_found', 0) }} of {{ candidates | length }} above
+      {{ '%.2f' | format(threshold) }}
+      {#- A `BOTH` route retrieves *and* searches. This card is bound to the document
+          search because that is the stage it names, so without this line the paid half
+          of the run would be drawn nowhere and the student would see a documents-only
+          run that had reached the web. `web_step` is undefined outside the canvas,
+          which Jinja reads as false. -#}
+      {%- if web_step %}
+      &middot; + {{ (web_step.attributes or {}).get('web_results_found', 0) }} from the web
+      {%- endif %}
+    </p>
+  </div>
+
+{# ── WEB SEARCH ────────────────────────────────────────────────────────────
+   The Search card on a route that never touched the documents. What the *model* chose
+   to search for, then where the answer will be cited from — because the one thing a
+   student has to be able to judge about a web-grounded answer is whose page it came
+   from, and that has to be legible before anyone clicks. #}
+{% elif step.step_type == 'call_tool' and a.get('tool') == 'search_web' %}
+  {% set results = a.get('web_sources') or [] %}
+  <div class="art art--web">
+    {# The agent's own wording, not the question. On a web route this is the whole of
+       the agentic decision the card exists to show: nothing else on the canvas is text
+       the model wrote in order to act rather than to answer. #}
+    <p class="art__query">{{ (a.get('query') or '')[:80] | e }}</p>
+    <ol class="webresults">
+      {% for s in results[:3] %}
+      <li>
+        <span class="webresults__title">{{ (s.get('title') or 'Untitled')[:56] | e }}</span>
+        {#- The host, not the full URL: a card is too small for a path, and the host is
+            the part a student judges. Split rather than parsed because Jinja has no
+            urlparse, and it degrades to the whole string on anything unexpected. -#}
+        <span class="webresults__host">{{ (s.get('url') or '').split('//')[-1].split('/')[0] | e }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+    <p class="art__foot">
+      {{ a.get('web_results_found', 0) }} result{{ '' if a.get('web_results_found') == 1 else 's' }}
+      {#- Web search is the one stage that is *always* paid, so the figure is shown
+          whenever it is non-zero rather than only above the usual threshold. -#}
+      {%- if step.cost_usd %} &middot; <span class="money">${{ '%.4f' | format(step.cost_usd) }}</span>{% endif %}
+    </p>
+  </div>
+
+{# ── AUGMENT ───────────────────────────────────────────────────────────────
+   The prompt as two bands in proportion: the rules the model is always given, and
+   the passages plus the question that change every time. Sized from the real
+   character counts, so a long retrieval visibly dwarfs the rules and a refusal
+   visibly does not. #}
+{% elif step.step_type == 'augment' %}
+  {% set total = a.get('prompt_chars', 0) or 1 %}
+  {% set rules = a.get('system_chars', 0) %}
+  <div class="art art--augment">
+    <p class="bands" aria-hidden="true">
+      <span class="band" data-part="rules" style="--w: {{ '%.3f' | format(rules / total) }}"></span>
+      <span class="band" data-part="context" style="--w: {{ '%.3f' | format((total - rules) / total) }}"></span>
+    </p>
+    <p class="art__legend">
+      <span data-part="rules">rules {{ rules }}</span>
+      <span data-part="context">context + question {{ total - rules }}</span>
+    </p>
+    <p class="art__foot">
+      {{ a.get('passages', 0) }} passage{{ '' if a.get('passages') == 1 else 's' }}
+      &middot; {{ total }} characters of prompt
+    </p>
+  </div>
+
+{# ── SYNTHESIZE / GENERATE ─────────────────────────────────────────────────  #}
+{% elif step.step_type in ('synthesize', 'generate') %}
+  <div class="art art--generate">
+    <p class="art__answer">{{ (step.raw_output or '')[:150] | e }}</p>
+    <p class="art__foot">
+      {% if a.get('llm_called') is false %}
+      no LLM call &mdash; nothing was retrieved
+      {% else %}
+      {{ step.prompt_tokens }}&rarr;{{ step.completion_tokens }} tokens
+      {%- if a.get('citations') is not none %} &middot; {{ a.get('citations') }} citation{{ '' if a.get('citations') == 1 else 's' }}{% endif %}
+      {% endif %}
+    </p>
+  </div>
+
+{# ── Anything else ─────────────────────────────────────────────────────────
+   A tool call, a ReAct iteration, a web search. No bespoke miniature, so the raw
+   output stands in — still real, still this step's own. #}
+{% else %}
+  <div class="art art--plain">
+    <p class="art__quote">{{ (step.raw_output or step.raw_input or '')[:120] | e }}</p>
+    <p class="art__foot">{{ step.duration_ms }} ms</p>
+  </div>
+{% endif %}

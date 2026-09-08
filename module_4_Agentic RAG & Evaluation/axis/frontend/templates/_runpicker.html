@@ -1,0 +1,52 @@
+{# Which run of each strategy to compare.
+
+   The page used to pin the last run of each, whatever those runs had asked — so asking
+   one question under Naive RAG and a different one under Agentic RAG produced a cost
+   ratio between two unrelated pieces of work, presented as though it measured what
+   orchestration costs.
+
+   A `GET` form with a submit button, so it works with scripts disabled; `axis.js`
+   submits it on change so the comparison recomputes without the button. The field names
+   *are* the strategy values, which is why the route can read them straight off the query
+   string and adding a strategy needs no mapping anywhere.
+
+   Expects `comparison` (from `_comparison`). #}
+
+<aside class="runpicker" aria-label="Runs to compare">
+  <form action="/compare" method="get" id="compare-form">
+    {% for strategy, options in comparison.options.items() %}
+    <div class="runpicker__field" data-strategy="{{ strategy }}">
+      <label class="eyebrow eyebrow--accent" for="pick-{{ strategy }}">
+        {{ comparison.labels.get(strategy, strategy) }}
+      </label>
+
+      {% if options %}
+      <select id="pick-{{ strategy }}" name="{{ strategy }}">
+        {% for run in options %}
+        <option value="{{ run.trace_id }}"
+                {% if run.trace_id == comparison.selected.get(strategy) %}selected{% endif %}>
+          {{ run.question | e }}{% if run.cost_usd %} &middot; ${{ '%.5f' | format(run.cost_usd) }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      {% else %}
+      {# Disabled rather than absent: an empty control says "this strategy has not run
+         yet" where a missing one says nothing at all, and the next thing to do is
+         obvious from it. #}
+      <select id="pick-{{ strategy }}" disabled>
+        <option>No runs yet &mdash; ask something under it</option>
+      </select>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <button type="submit" class="button--small">Compare these</button>
+    <span class="demoload__hint">
+      {%- if comparison.matched -%}
+      Both runs asked the same question, so the differences below are the orchestration.
+      {%- else -%}
+      Pick the same question under both to measure what the orchestration costs.
+      {%- endif -%}
+    </span>
+  </form>
+</aside>

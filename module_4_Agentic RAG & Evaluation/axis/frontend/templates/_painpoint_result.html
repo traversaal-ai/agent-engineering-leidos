@@ -1,0 +1,158 @@
+{# Both runs of one pain point, side by side.
+
+   **Baseline on the left, deliberately.** The page reads "here is what happens, and
+   here is what the extra machinery changes" rather than as a victory lap — and on a
+   single-fact question the honest reading of the same layout is that agentic wasted
+   money, which is the other half of what this platform exists to teach.
+
+   **Both answers are on the page, and the numbers do not stand in for them.** The
+   step counts say what each path *did*; only the answers say what it was worth, and
+   nothing here claims one answer is better. That is the same restraint the Compare
+   page's withheld verdict exercises, and for the same reason: this platform measures
+   cost and ground covered, not answer quality (`Axis_Notebook_Alignment.md` §4).
+
+   Expects `results.runs`, keyed by strategy value, plus `results.question` and
+   `results.verified` — what was actually asked, and whether the card's measured figure
+   describes it. Both are held with the result rather than re-derived on render: the
+   corpus cookie can change between the run and the next page load, and a result
+   relabelled "verified" by a corpus switch would be exactly the dishonesty this page
+   exists to avoid. #}
+
+{% if not results.verified and results.question %}
+{# What was actually asked. Only in unverified mode: with the demo corpus the question
+   is printed above the button already, and repeating it under the result would read as
+   two different questions. Here the box is empty again after the post, so without this
+   the result is a pair of answers to a question nobody can see. #}
+<p class="versus__asked">
+  <span class="eyebrow">You asked</span>
+  {% if results.context_question %}
+  <span class="painpoint__turn"><span>first</span> {{ results.context_question }}</span>
+  <span class="painpoint__turn"><span>then</span> {{ results.question }}</span>
+  {% else %}
+  {{ results.question }}
+  {% endif %}
+</p>
+{% endif %}
+
+<div class="versus">
+  {% for strategy, label in (('naive_rag', 'Naive RAG'), ('agentic_rag', 'Agentic RAG')) %}
+  {% set run = results.runs.get(strategy) %}
+  <section class="versus__side" data-strategy="{{ strategy }}">
+    <h3 class="versus__name">{{ label }}</h3>
+
+    {% if not run %}
+    <p class="versus__empty">Did not run.</p>
+
+    {% elif run.error %}
+    {# A failure is shown in its own column rather than blanking the pair — the same
+       rule Compare mode follows for a partially-failing run. A strategy that failed
+       expensively has still spent the class's money. #}
+    <p class="versus__error">{{ run.error }}</p>
+
+    {% else %}
+    <dl class="versus__figures">
+      <div>
+        <dt>retrievals</dt>
+        <dd>{{ run.retrievals }}</dd>
+      </div>
+      <div>
+        <dt>trace steps</dt>
+        <dd>{{ run.steps }}</dd>
+      </div>
+      <div>
+        <dt>cost</dt>
+        <dd>${{ '%.6f' | format(run.answer.cost_usd) }}</dd>
+      </div>
+      <div>
+        <dt>latency</dt>
+        <dd>{{ run.answer.latency_ms }}&thinsp;ms</dd>
+      </div>
+    </dl>
+
+    {# The stages each path actually ran, read off its own trace. This is where the
+       difference is legible without reading a word of either answer: the baseline's
+       list is short because the mechanisms simply are not there. #}
+    <p class="versus__stages">
+      {% for stage in run.stages %}
+      <span class="decision" data-on="true">{{ STAGE_TITLES.get(stage, stage) }}</span>
+      {% endfor %}
+    </p>
+
+    <div class="versus__answer">
+      {% if run.answer.grounded %}
+      <p>{{ run.answer.answer }}</p>
+      {% else %}
+      {# Withheld, not empty. Both strategies refuse rather than fabricate, and a
+         refusal is a result worth reading — on the unanswerable questions it is the
+         *correct* one. #}
+      <p class="versus__withheld">{{ run.answer.answer }}</p>
+      {% endif %}
+    </div>
+
+    {% if run.answer.citations %}
+    <p class="versus__cites">
+      {% for c in run.answer.citations %}
+      <span class="cite" data-kind="{{ c.kind }}">
+        {%- if c.kind == 'web' -%}
+        {{ c.url or 'web result' }}
+        {%- else -%}
+        {{ c.filename or c.source_location }}
+        {%- endif -%}
+      </span>
+      {% endfor %}
+    </p>
+    {% endif %}
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+
+{% set agentic = results.runs.get('agentic_rag') or {} %}
+{% if agentic.fired is false %}
+{# **The honesty check, and the most important thing on this page.**
+
+   Against the offline fake providers the model cannot classify or split anything,
+   so the router falls back to "simple", the mechanism never fires, and the agentic
+   column makes exactly one retrieval — the same as the baseline, for about a hundred
+   times the cost. Both numbers are real and the obvious reading of them is wrong:
+   not "this needs a real model" but "the mechanism does nothing".
+
+   That reading has to be closed off explicitly, because it is the more natural one.
+   `_mechanism_fired` reads the trace and says which happened. #}
+<p class="versus__caveat">
+  <strong>The mechanism did not fire on this run</strong>, so the two columns above
+  differ in cost and not in what they found.
+  {% if results.verified %}
+  That is what happens without a model that can classify and split &mdash; the offline
+  stand-in cannot, so the router correctly treats every question as simple. The figure
+  under <em>Measured</em> above is the one to trust: it holds the model's ability out
+  and measures the mechanism itself. To watch it fire live, run with a real provider:
+  <code>AXIS_LLM__PROVIDER=openai</code>.
+  {% else %}
+  {# Two candidate causes here rather than one, and the page must not pick for you.
+     With the golden question the shape is known, so a mechanism that did not fire is
+     the model's limitation. On a question a student typed, the question itself is the
+     other candidate — a single-fact lookup genuinely has nothing to decompose, and
+     reporting that is the exercise working. #}
+  Two things can cause that and this run cannot tell them apart: the question may not
+  be the shape this card is about &mdash; a single-fact lookup has nothing to split, and
+  the router is right to treat it as simple &mdash; or the model may be unable to
+  classify it, which is always true of the offline stand-in
+  (<code>AXIS_LLM__PROVIDER=openai</code> to rule it out). There is no measured figure to
+  fall back on here, because you chose the question. Try the demo corpus for the
+  version that has one.
+  {% endif %}
+</p>
+{% elif agentic.fired %}
+<p class="versus__fired">
+  The mechanism fired on this run &mdash; the difference above is what it bought,
+  not only what it cost.
+</p>
+{% endif %}
+
+<p class="versus__note">
+  The figures say what each path cost. Only the answers say what it bought, and this
+  page does not judge them &mdash; Axis measures cost and ground covered, not answer
+  quality. Read both, and
+  <a href="/trace">open the trace</a> to see which stages produced the difference.
+</p>

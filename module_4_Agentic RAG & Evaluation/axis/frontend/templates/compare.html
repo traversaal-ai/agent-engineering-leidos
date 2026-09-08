@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Compare &middot; Axis{% endblock %}
+
+{# Two runs of the same question, side by side.
+
+   Its own page rather than a tab beside the canvas: the comparison spans two runs under
+   two strategies, and the canvas shows one pipeline executing.
+
+   It used to pin the *last* run of each strategy, whatever those runs had asked, so a
+   session where the two strategies answered different questions produced a cost ratio
+   between two unrelated pieces of work. The picker on the right is what makes the
+   comparison a comparison. #}
+
+{% block content %}
+<div class="page page--split">
+  <div class="page__main">
+    <header class="page__head">
+      <h1 class="page__title">Comparison</h1>
+      <p class="page__lede">
+        One run of each strategy, chosen on the right. The differences are only the
+        orchestration if both runs answered the same question &mdash; so the page says
+        when they did not, and keeps its verdict to itself.
+      </p>
+    </header>
+    {% include "_compare.html" %}
+  </div>
+
+  {% if comparison %}
+  {% include "_runpicker.html" %}
+  {% endif %}
+</div>
+{% endblock %}

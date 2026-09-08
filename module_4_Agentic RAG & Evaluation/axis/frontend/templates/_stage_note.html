@@ -1,0 +1,52 @@
+{# What a stage actually did, in the few words that fit under its name on the rail.
+
+   Its own partial because this is the string that used to exist twice — once in
+   `_pipeline.html` and once in `axis.js`'s `describe()` — and the two drifted. There
+   is now one copy, and `axis.js` fetches the rail rather than rebuilding it, so there
+   is no second place for it to drift to.
+
+   Expects `step`. Deliberately terse: the pane below says everything, and a rail node
+   that needs reading rather than glancing at has stopped being a map. #}
+
+{%- set a = step.attributes or {} -%}
+
+{%- if step.step_type == 'parse' -%}
+{{ a.get('blocks', 0) }} block{{ '' if a.get('blocks') == 1 else 's' }}
+
+{%- elif step.step_type == 'chunk' -%}
+{{ a.get('chunk_count', 0) }} chunk{{ '' if a.get('chunk_count') == 1 else 's' }}
+
+{%- elif step.step_type == 'embed' -%}
+{{ a.get('dimensions', 0) }} dims
+
+{%- elif step.step_type == 'store' -%}
+{{ a.get('total_in_index', 0) }} indexed
+
+{%- elif step.step_type == 'route' -%}
+{{ a.get('source', 'documents') }}
+{%- if a.get('needs_decomposition') %} &middot; split{% endif %}
+
+{%- elif step.step_type == 'decompose' -%}
+{{ a.get('sub_questions', 1) }} sub-question{{ '' if a.get('sub_questions', 1) == 1 else 's' }}
+
+{%- elif step.step_type == 'retrieve' -%}
+{%- set found = a.get('chunks_found', 0) -%}
+{%- if found -%}
+{{ found }} of {{ (a.get('candidates') or []) | length }} kept
+{%- else -%}
+nothing above {{ '%.2f' | format(a.get('threshold', 0)) }}
+{%- endif -%}
+
+{%- elif step.step_type == 'augment' -%}
+{{ a.get('prompt_chars', 0) }} chars
+
+{%- elif step.step_type in ('synthesize', 'generate') -%}
+{%- if a.get('llm_called') is false -%}
+no LLM call
+{%- else -%}
+{{ a.get('citations', 0) }} citation{{ '' if a.get('citations') == 1 else 's' }}
+{%- endif -%}
+
+{%- else -%}
+{{ step.duration_ms }} ms
+{%- endif -%}

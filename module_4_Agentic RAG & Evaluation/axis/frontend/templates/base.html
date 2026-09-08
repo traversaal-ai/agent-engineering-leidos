@@ -1,0 +1,627 @@
+{# Base layout: top bar, left rail, main canvas.
+
+   Inter is vendored under /static rather than pulled from a CDN: PRD Section 5
+   requires the whole system run on a single machine with no dependency on fragile
+   network infrastructure, and a CDN fetch during a live demo is exactly that.
+   Module 3 loads the same family from Google Fonts and can afford to; Axis cannot.
+   See static/VENDOR.md.
+
+   Every font stack has a real fallback, because the woff2 files are not committed
+   — the page has to look composed with none of them installed. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Axis{% endblock %}</title>
+  {# Inline, so there is no file to vendor and no request to 404. Browsers ask for
+     /favicon.ico unprompted, and an unexplained 404 on every page load is the same
+     kind of log noise as the font files were.
+     Module 3's mark, redrawn: a teal rounded square carrying the diamond from the
+     wordmark. A student with both demos open has two tabs, and they should read as
+     one family — which is the whole reason the palette moved. #}
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2320808d'/%3E%3Cpath d='M16 6l10 10-10 10L6 16z' fill='%23fcfcf9'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {# Linked only when the woff2 files exist. Unconditional @font-face rules meant
+     three 404s per page load on every fresh checkout — harmless, since the font
+     stacks fall back to the platform sans, but a log full of red is
+     indistinguishable from a real fault. #}
+  {% if fonts_available %}
+  <link rel="stylesheet" href="{{ asset('fonts.css') }}">
+  {% endif %}
+</head>
+{# `data-strategy` is the single hook for strategy identity colour. Every component
+   that needs it reads one variable, `--strategy`, resolved from this attribute — so
+   choosing a colour is one decision here rather than the same decision repeated in
+   the rail, the canvas, the answer card and the trace. axis.js updates it on
+   selection; without JS the server-rendered value is correct for the rendered page. #}
+<body data-strategy="{{ selected_strategy or '' }}">
+
+<header class="topbar">
+  <div class="wordmark">
+    <span class="wordmark__mark" aria-hidden="true">&#9670;</span>
+    <span>Axis</span>
+    {# Says what the demo actually measures, and nothing more. It once promised "two
+       axes, four strategies… agentic orchestration and graph retrieval" — a masthead
+       overstating what is on screen is the first thing a class notices. #}
+    <span class="wordmark__tag">
+      What agentic orchestration costs, and whether it earns it &mdash; measured on
+      your own documents, step by step.
+    </span>
+  </div>
+
+  {# Plain links, not tabs.
+
+     These were radios beside the canvas, revealed by `body:has()`. It worked and it
+     was wrong: a switcher makes the canvas one option among four, when the canvas is
+     what the product is. Compare spans two runs and the raw trace spans every run, so
+     neither is a view *of* the pipeline on screen — they are separate readings, and a
+     link that navigates says so. It also costs nothing: these are server-rendered pages
+     and the back button returns to the canvas exactly as it was.
+
+     "Run", not "Canvas". The three links are three readings of one subject — the run
+     happening now, two runs measured against each other, one run exactly as recorded —
+     and naming the first after its drawing surface made it the odd one out of a set that
+     is otherwise about runs. "Canvas" is also our word: it names a component, and a
+     student has no reason to learn it to use the page. The nav key follows the page
+     (`nav == 'run'`); the diagram keeps the name everywhere it is one — `/canvas`,
+     `_canvas.html`, `.canvasboard`. #}
+  {# Summarize last. Run, Compare and Trace are the sequence a session actually follows
+     — ask, measure, inspect — and putting a fourth thing in the middle of it costs more
+     than the adjacency to Run was worth. It is still a page at the same level as the
+     others rather than a button in the rail, which is what mattered: the most expensive
+     action in the product should not be a one-click side effect of the document list. #}
+  <nav class="topnav">
+    <a href="/" {% if nav == 'run' %}aria-current="page"{% endif %}>Run</a>
+    <a href="/compare" {% if nav == 'compare' %}aria-current="page"{% endif %}>Compare</a>
+    <a href="/trace" {% if nav == 'trace' %}aria-current="page"{% endif %}>Trace</a>
+    {# Fifth, after the three readings of a run and before Summarize. Run, Compare and
+       Trace are the sequence a session follows — ask, measure, inspect — and this is
+       a step back from all three: not a reading of *your* run but the four questions
+       that show why the machinery exists. It sits next to Summarize because Summarize
+       is the mechanism its first card names. #}
+    <a href="/why-agentic" {% if nav == 'why' %}aria-current="page"{% endif %}>Why agentic</a>
+    <a href="/summarize" {% if nav == 'summarize' %}aria-current="page"{% endif %}>Summarize</a>
+  </nav>
+
+  {# Label-over-value readouts, as in the reference's MODE / API CALLS block.
+     Health lives here as a dot plus a word — colour and text both, so it
+     survives a projector and a colour-blind reader. #}
+  <div class="readouts">
+    {# Against the demo's own set, never a hardcoded number: a literal denominator
+       here reported "2 / 4" for a while after the graph strategies were cancelled,
+       claiming a shortfall against something nobody was building. #}
+    <div class="readout">
+      <p class="eyebrow">Strategies</p>
+      <div class="readout__value">
+        {{ health.available_strategies | length }}&thinsp;/&thinsp;{{ strategies | length }}
+      </div>
+    </div>
+    {% if session_spend is not none %}
+    <div class="readout">
+      <p class="eyebrow">Session</p>
+      <div class="readout__value">${{ '%.4f' | format(session_spend) }}</div>
+    </div>
+    {% endif %}
+    <div class="readout" title="{{ health.config_error or '' }}">
+      <p class="eyebrow">Health</p>
+      <div class="readout__value">
+        <span class="dot dot--{{ health.status }}"></span>{{ health.status }}
+      </div>
+    </div>
+  </div>
+</header>
+
+{# The rail is on every page, and each group renders where it can act.
+
+   **The rule was never "no rail".** It was *no control that cannot act*: the strategy
+   radios carry `form="ask-form"`, which exists only on the Run page, so on Compare and
+   the raw trace they were controls that looked live, moved their own highlight when
+   clicked, and changed nothing. That is still true, and those groups still render on
+   the Run page alone.
+
+   What changed is that two of the groups can act everywhere. The corpus toggle decides
+   what *any* page is showing you — which run to compare, which trace to read, which
+   documents a pain point is demonstrated against — and having it on one page of five
+   meant navigating back to Run to change what the other four were about. The layer
+   readout is the same shape: a backend that has gone down is worth knowing about on the
+   page you are actually on.
+
+   So the composition, and the reason for each absence:
+
+     Corpus, Layers      every page   — see above
+     Conversation, Cache, Web search  Run and Why — they configure the *next* run, and
+                                      those are the two pages that start one
+     Documents, Start over            Run and Summarize — Summarize picks documents;
+                                      Compare and Trace read runs already finished
+     Pace                Run          only the canvas animates
+     Strategies          Run          `form="ask-form"`; and Why runs *both* by design
+
+   `shell--bare` is gone with it: every page now has the two-column grid. #}
+{% set can_run = nav in ('run', 'why') %}
+{% set can_setup = nav in ('run', 'summarize') %}
+<div class="shell">
+
+  <aside class="rail">
+    {# Which corpus is live. First in the rail because it scopes everything below and
+       everything on the page: the document list, the labelled questions, what a
+       question retrieves from, what a summary reads.
+
+       Both corpora are always drawn, including an empty one — a toggle that appears
+       only once there is something to toggle to is a toggle nobody discovers, and
+       "My documents · 0" is what says uploading is possible without a student having
+       to guess.
+
+       Switching costs nothing. Both stay indexed and both keep their cached answers;
+       only the scope retrieval reads changes. See `set_corpus` in frontend/app.py. #}
+    <div class="rail__group">
+      <p class="eyebrow eyebrow--accent">Corpus</p>
+      <form class="corpuspick" action="/corpus" method="post">
+        {% for c in corpora %}
+        <button type="submit" name="corpus" value="{{ c.name }}"
+                class="corpuspick__option"
+                {% if c.active %}aria-pressed="true"{% endif %}>
+          <span class="corpuspick__name">{{ c.label }}</span>
+          <span class="corpuspick__count">{{ c.count }} / {{ c.limit }}</span>
+        </button>
+        {% endfor %}
+      </form>
+      <span class="demoload__hint">
+        {%- if corpus == 'demo' -%}
+        Searching the demo set &mdash; the documents every measured claim on this site
+        was taken against. Your own uploads are still indexed and untouched.
+        {%- else -%}
+        Searching your own uploads. The demo set is still indexed; switching back finds
+        it exactly as it was, including anything already answered.
+        {%- endif -%}
+      </span>
+
+      {# The set every measured claim on this site was taken against.
+
+         In the corpus group rather than under Documents, and offered from either
+         corpus, because it *is* a corpus action: the route always loads into `demo` and
+         switches the browser to it, so pressing it from your own documents is a
+         coherent thing to do rather than a mistake. It used to be gated on the session
+         being empty entirely — the limit was per session and the set is exactly five
+         files, so one upload permanently blocked it. That reasoning is gone.
+
+         Off by default, and the button is the visible half of that. Loading the set
+         indexes five documents through the configured embedding provider, which on a
+         real one is five paid round trips per click, in a sidebar, in a room of twenty.
+         `AXIS_DEMO__DOCUMENTS_ENABLED=true` brings it back; the route refuses either
+         way, because a stale page reaches it without the button. #}
+      {% set demo_row = (corpora | selectattr('name', 'equalto', 'demo') | first) %}
+      {% if limits.demo_documents_enabled and demo_row and demo_row.count == 0 %}
+      {# The busiest click in the product: five paid embedding round trips, and until
+         now it showed nothing at all while they happened. The spinner was already in
+         this markup and no code ever turned it on — `data-busy-label` is what wires it,
+         and is also the word shown while it runs. #}
+      <form class="demoload" action="/demo-documents" method="post"
+            data-busy-label="Loading">
+        <button type="submit" class="button--small button--ghost">
+          <span class="button__label">Load the demo set</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+        <span class="demoload__hint">
+          Five documents with example questions whose outcome is already measured.
+          Loads into the demo corpus and switches to it; your own uploads are untouched.
+        </span>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if nav == 'run' %}
+    {# The strategies the demo offers — `DEMO_STRATEGIES` in frontend/app.py, which is
+       both of them. Each carries its orchestration label, which is the variable the
+       whole product measures; there is no second label because retrieval is held fixed
+       and a constant is not worth a column (System Design Section 9).
+
+       `enabled` can be false: Agentic RAG is advertised but unavailable when the
+       configured provider cannot call tools, and it is shown disabled *with its reason*
+       rather than hidden — a comparison missing half of itself needs explaining, unlike
+       a strategy nobody built.
+
+       Run only, and this is the group the whole rule came from: the radios carry
+       `form="ask-form"`, so anywhere else they would move their own highlight and act
+       on nothing. Why agentic deliberately runs *both* strategies, so a selector there
+       would contradict the page. #}
+    <div class="rail__group">
+      <p class="eyebrow eyebrow--accent">Strategies</p>
+      <ul class="strategies">
+        {% for s in strategies %}
+        <li>
+          <label class="strategy
+                        {{ 'strategy--on' if s.value == selected_strategy and s.enabled }}
+                        {{ 'strategy--off' if not s.enabled }}"
+                 data-strategy="{{ s.value }}">
+            <input type="radio" name="strategy" value="{{ s.value }}"
+                   form="ask-form"
+                   {% if not s.enabled %}disabled{% endif %}
+                   {% if s.value == selected_strategy and s.enabled %}checked{% endif %}>
+            <span class="strategy__num">{{ '%02d' | format(loop.index) }}</span>
+            <span class="strategy__name">{{ s.label }}</span>
+            <span class="strategy__axes">
+              {{ 'Agentic' if s.is_agentic else 'Single-shot' }}
+            </span>
+            {% if not s.enabled %}
+            <span class="strategy__pending">unavailable in this configuration</span>
+            {% endif %}
+          </label>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if can_setup %}
+    {# Upload lives in the rail with the file list, not in the main column. It is
+       setup, not the subject: once two documents are indexed nobody touches it
+       again, and it was taking the top of the canvas away from the run.
+
+       On Summarize as well as Run, because Summarize picks from this same list and
+       having to navigate back to add a document to a summary is a round trip through
+       another page for a control that already exists. Not on Compare or Trace: both
+       read runs that have already happened, and a document uploaded there changes
+       nothing on screen. #}
+    <div class="rail__group">
+      <p class="eyebrow eyebrow--accent">
+        Documents
+        <span class="rail__scope">{{ 'demo corpus' if corpus == 'demo' else 'your uploads' }}</span>
+      </p>
+
+      {# Upload does real work — parse, chunk, embed, index — which is a paid round
+         trip per document and takes seconds. It used to show nothing at all while it
+         ran, so the only reading available was that the click had not registered.
+
+         axis.js puts this form into a busy state on submit; the redirect that follows
+         is what clears it, so nothing has to clear it by hand. The button is *not*
+         disabled here in the markup for the ordinary case: without JavaScript there is
+         nothing to re-enable it, and a permanently dead upload button would be far
+         worse than a wasted round trip on an empty selection.
+
+         **The full session is the exception**, and it does not conflict with that
+         reasoning. `full` is server-rendered from what the session holds and can only
+         change on another page load — after a "Start over" — so there is nothing for a
+         script to re-enable and no state to get stuck in. The Backend already refuses
+         the upload whole (`UploadLimitError` in backend/api/v1/documents.py); leaving
+         the control live meant the only way to learn the limit was to hit it, and the
+         file picker would open, accept a 25 MB selection and throw it away. #}
+      {% set full = documents | length >= limits.max_files_per_session %}
+      <form class="upload" id="upload-form" action="/upload" method="post"
+            enctype="multipart/form-data">
+        <label class="upload__drop {{ 'upload__drop--full' if full }}">
+          <input type="file" name="files" multiple
+                 {% if full %}disabled{% endif %}
+                 accept="{{ limits.allowed_extensions | join(',') }}">
+          {# The types belong on screen, not only in `accept`. That attribute filters
+             the file dialog and says nothing to a student looking at the page — so
+             "why won't it take my .csv?" had no answer anywhere in the UI. #}
+          <span class="upload__hint" data-default="{{ documents | length }} / {{ limits.max_files_per_session }} files &middot; {{ (limits.max_bytes_per_file / 1048576) | round | int }} MB each">
+            {{ documents | length }} / {{ limits.max_files_per_session }} files &middot;
+            {{ (limits.max_bytes_per_file / 1048576) | round | int }} MB each
+          </span>
+          <span class="upload__types">
+            {{ limits.allowed_extensions | map('replace', '.', '') | join(' ') }}
+          </span>
+        </label>
+        <button type="submit" class="button--small" {% if full %}disabled{% endif %}>
+          <span class="button__label">Upload &amp; index</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+        {% if full %}
+        <span class="upload__full">
+          Maximum of {{ limits.max_files_per_session }} files reached in this corpus.
+          Clear it below, or switch to the other one &mdash; they have separate limits.
+        </span>
+        {% endif %}
+      </form>
+
+      {# Summarizer mode used to be a button here, and running it was one click with no
+         choice of documents and no way back to its result. It is a page in the top bar
+         now — the most expensive action Axis offers should not be a side effect of the
+         document list, and choosing which documents to read is what makes its cost
+         curve something a class can watch. #}
+
+      {# The document list is also the indexing track's selector.
+
+         The canvas has one card per stage and binds the most recent step of each, so it
+         described whichever document finished last — and after loading four documents
+         that is often a one-chunk image caption rather than the policy document the
+         class came to look at. There was a chip per document inside an opened card and
+         it did nothing at all: `/?stage=<an earlier document's chunk>` matched no card,
+         so the board opened, no card expanded, and every one still drew the last
+         document. Selecting here moves all four stages together, which is the only
+         coherent thing for them to do.
+
+         Plain links, so it needs no script. Only documents with an ingest run behind
+         them are links: one rejected before indexing has no stages to show, and a link
+         that silently fell back to a different document is worse than no link. #}
+      {% if documents %}
+      <ul class="documents">
+        {% for doc in documents %}
+        {% set selectable = doc.document_id and doc.document_id in indexed_documents %}
+        <li class="documents__item">
+          {% if selectable %}
+          <a class="documents__name documents__name--pick
+                    {{ 'documents__name--on' if doc.document_id == selected_document }}"
+             href="/?document={{ doc.document_id }}"
+             {% if doc.document_id == selected_document %}aria-current="true"{% endif %}>
+            <span class="dot dot--{{ doc.status }}"></span>
+            {{ doc.filename | e }}
+          </a>
+          {% else %}
+          <span class="documents__name">
+            <span class="dot dot--{{ doc.status }}"></span>
+            {{ doc.filename | e }}
+          </span>
+          {% endif %}
+          {% if doc.status == 'ready' %}
+          {# Chunk count comes from the index, not the upload record, so zero
+             means "nothing retrievable" rather than "not uploaded". #}
+          <span class="documents__meta">{{ doc.chunk_count }} chunk{{ '' if doc.chunk_count == 1 else 's' }}</span>
+          {% else %}
+          <span class="documents__error">{{ doc.error | e }}</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% if indexed_documents | length > 1 %}
+      <span class="demoload__hint">
+        Choose one to see its parse, chunk, embed and store stages on the canvas.
+      </span>
+      {% endif %}
+      {% else %}
+      <p class="documents__empty">Nothing indexed yet.</p>
+      {% endif %}
+    </div>
+
+    {# Two different things to throw away, and offering only the second is what made
+       a full corpus unrecoverable.
+
+       *Clear this corpus* removes one corpus's documents and the vectors behind them,
+       and keeps everything else — the other corpus, the spend readout, the
+       conversation, and every run on the Trace page. It is what makes a corpus
+       *reloadable*: an instructor can reload the demo set for a second group without
+       losing the first group's trace.
+
+       *Start over* discards the session: both corpora, the ledger, the history. It is
+       what makes the indexing story repeatable — a class watches a document become
+       vectors, and the next group has to watch the same thing. Without it an
+       instructor cleared cookies in front of the room. #}
+    {% if documents %}
+    <form class="demoload" action="/corpus/clear" method="post"
+          data-busy-label="Clearing">
+      <input type="hidden" name="corpus" value="{{ corpus }}">
+      <button type="submit" class="button--small button--ghost">
+        <span class="button__label">Clear this corpus</span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+      <span class="demoload__hint">
+        Removes these {{ documents | length }} document{{ '' if documents | length == 1 else 's' }}
+        and their vectors. The other corpus, the run history and the spend are kept.
+      </span>
+    </form>
+    {% endif %}
+
+    <form class="demoload" action="/reset" method="post"
+          data-busy-label="Starting over">
+      <button type="submit" class="button--small button--ghost">
+        <span class="button__label">Start over</span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+      <span class="demoload__hint">
+        Clears both corpora, the index and the run history.
+      </span>
+    </form>
+    {% endif %}
+
+    {% if can_run %}
+    {# Web search, cache and conversation: the three that configure the *next* run.
+
+       Run and Why agentic, because those are the two pages that start one. Not on
+       Compare or Trace, which read runs that have already finished — a cache toggle
+       there would be a control whose only effect is on a page you are not on, which is
+       the same defect as a strategy radio with no form to submit to. #}
+    {# The web route.
+
+       Drawn only when the Backend reports a search provider is configured
+       (`AXIS_SEARCH__PROVIDER`, read server-side). A switch that cannot enable anything
+       is worse than no switch: it invites "I turned it on, why is nothing happening?",
+       which is not the question the demo exists to answer.
+
+       **Off by default**, and the toggle is the visible form of "web search is opt-in".
+       Configuring a provider makes the route *available*; asking for it is a separate
+       act, because a web call is paid, goes to a third party, and carries the
+       prompt-injection exposure of System Design Section 6.5.
+
+       Two submit buttons rather than a checkbox, exactly like Pace above: a checkbox
+       needs a script to submit on change, and a checkbox plus an Apply button is two
+       clicks for a binary. This works with scripts disabled and takes one. #}
+    {% if health.web_search_available %}
+    <div class="rail__group">
+      <p class="eyebrow eyebrow--accent">Web search</p>
+      <form class="pace" action="/websearch" method="post">
+        <button type="submit" name="on" value="0" class="pace__option"
+                {% if not web_search %}aria-pressed="true"{% endif %}>Off</button>
+        <button type="submit" name="on" value="1" class="pace__option"
+                {% if web_search %}aria-pressed="true"{% endif %}>On</button>
+      </form>
+      <span class="demoload__hint">
+        {%- if web_search -%}
+        {# Names the escalation rather than saying "on", because *when* it is used is
+           the teaching point: the loop only runs where a document search already came
+           back empty, so the web is a fallback and not a parallel source. #}
+        The agent may search the web when your documents come up empty. Costs money per
+        search.
+        {#- Shown by CSS while the baseline is selected, the same way the agentic-only
+            cards are revealed — `selected_strategy` is server-rendered and the radio is
+            not, so a Jinja condition here would still say "only Agentic RAG can use it"
+            after the student had selected Agentic RAG. Pure CSS on `:checked`, so it is
+            correct with scripts disabled too. -#}
+        <span class="websearch__baseline">
+          <strong>Only Agentic RAG can use it</strong> &mdash; the baseline never leaves
+          your documents, which is what makes it a baseline.
+        </span>
+        {%- else -%}
+        Off. The agent can only search your documents; if they do not cover a question,
+        it says so.
+        {%- endif -%}
+      </span>
+    </div>
+    {% endif %}
+
+    {# Cache and conversation, the two controls the new agentic stages need.
+       Grouped together because they are the same shape of thing — both decide what
+       the *next* question is allowed to know — and because a student turning the
+       cache off is usually about to ask something they already asked. #}
+    <div class="rail__group">
+      <p class="eyebrow eyebrow--accent">Cache</p>
+      <form class="pace" action="/cache" method="post">
+        <button type="submit" name="on" value="0" class="pace__option"
+                {% if not cache_on %}aria-pressed="true"{% endif %}>Off</button>
+        <button type="submit" name="on" value="1" class="pace__option"
+                {% if cache_on %}aria-pressed="true"{% endif %}>On</button>
+      </form>
+      <span class="demoload__hint">
+        {%- if cache_on -%}
+        A question close enough to one already answered is served from store, with no
+        model call at all.
+        <span class="websearch__baseline">
+          <strong>Only Agentic RAG has one</strong> &mdash; the baseline pays full
+          price every time, which is what makes it a baseline.
+        </span>
+        {%- else -%}
+        Off. Every question is answered from scratch, so a repeat costs what the
+        first one did &mdash; turn it on to see the difference.
+        {%- endif -%}
+      </span>
+    </div>
+
+    <div class="rail__group">
+      <p class="eyebrow eyebrow--accent">Conversation</p>
+      <p class="rail__count">
+        {{ turn_count }} turn{{ '' if turn_count == 1 else 's' }} in view
+      </p>
+      <form action="/conversation/reset" method="post">
+        <button type="submit" class="button--small button--ghost">New conversation</button>
+      </form>
+      <span class="demoload__hint">
+        {%- if turn_count -%}
+        A follow-up is resolved against these before anything is searched for, so
+        &ldquo;how long is it?&rdquo; can find something. Starting a new conversation
+        keeps your documents and every run on the Trace page.
+        {%- else -%}
+        Nothing asked yet. Once something is, a follow-up can refer back to it &mdash;
+        the baseline cannot do this and will answer as though you never asked.
+        {%- endif -%}
+      </span>
+    </div>
+    {% endif %}
+
+    {% if nav == 'run' %}
+    {# Slow motion.
+
+       Parsing and chunking are local work of a few milliseconds, and against the
+       offline fake providers a whole ingest is about twenty — so "watch a document
+       become vectors" is not something any polling interval can deliver. This inserts a
+       pause *between* stages and never inside one, so every duration, token count and
+       cost on the canvas is exactly what it would be with this off. The canvas says it
+       is paced while it is, and that pairing is what makes a deliberate delay honest in
+       a tool whose whole claim is that its numbers are real.
+
+       A plain form with a submit button per option, so it needs no script: `onchange`
+       submission would be the nicer interaction and would leave the control dead on the
+       no-JavaScript path.
+
+       Run only, because only the canvas animates. Pacing a page with nothing to watch
+       would be a control that makes the wait longer and shows nothing for it. #}
+    <div class="rail__group">
+      <p class="eyebrow eyebrow--accent">Pace</p>
+      <form class="pace" action="/pace" method="post">
+        {% for ms, label in pace_choices %}
+        <button type="submit" name="pace_ms" value="{{ ms }}"
+                class="pace__option"
+                {% if ms == pace_ms %}aria-pressed="true"{% endif %}>{{ label }}</button>
+        {% endfor %}
+      </form>
+      <span class="demoload__hint">
+        {%- if pace_ms -%}
+        Holds {{ '%.1f' | format(pace_ms / 1000) }}s before each stage so a class can
+        follow. Timings and costs are unaffected.
+        {%- else -%}
+        Runs at full speed. Some stages take milliseconds and pass too quickly to watch.
+        {%- endif -%}
+      </span>
+    </div>
+    {% endif %}
+
+    {# Every page. A backend that has gone down is worth knowing about on the page you
+       are actually on, and this is a readout rather than a control — there is nothing
+       here that could fail to act. #}
+    <div class="rail__group">
+      <p class="eyebrow eyebrow--accent">Layers</p>
+      <ul class="layers">
+        {% for layer in health.layers %}
+        <li>
+          <span class="dot dot--{{ layer.status }}"></span>
+          <span class="layers__name">{{ layer.name }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </aside>
+
+  <main class="canvas">
+    {# Setup notices sit above the content, with the config banner — a warning
+       below the fold is a warning nobody reads. #}
+    {% if health.config_error %}
+    <div class="banner">
+      <strong>Configuration problem.</strong>
+      <pre>{{ health.config_error }}</pre>
+    </div>
+    {% endif %}
+
+    {% if flash %}
+    <div class="banner banner--warn"><strong>{{ flash | e }}</strong></div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+
+    <footer>
+      <span>Axis {{ health.version | default('') }}</span>
+      {# Counted against the demo's own set, so it reads "2 of 2" when both are live
+         and "1 of 2" when a provider cannot call tools — which is a real shortfall a
+         student can act on, unlike a denominator counting unbuilt work. #}
+      <span>
+        {{ health.available_strategies | length }} of {{ strategies | length }}
+        strategies live
+      </span>
+      {# Demoted from a top-of-page amber banner at Milestone 2.
+         The reasoning that put warnings above the content — "a warning below the
+         fold is a warning nobody reads" — is right for a *problem*. This is not
+         one: the design is built to work on the platform sans, every stack names a
+         real system face, and nothing is broken. A permanent amber bar at the top
+         of a projected page trains an audience to ignore banners, and it was the
+         single most prominent element on screen for a purely cosmetic gap. #}
+      {% if not fonts_available %}
+      <span>
+        Inter not vendored &mdash; see
+        <code>frontend/static/VENDOR.md</code>
+      </span>
+      {% endif %}
+    </footer>
+  </main>
+
+</div>
+
+{# Unconditional, because it is ours and it is committed — no vendoring gate, no
+   CDN, no build step. HTMX used to be here behind `htmx_available`, which was never
+   true: the files were never downloaded, so no script had ever run in this app.
+
+   Everything in axis.js is progressive enhancement. With it, Ask streams the run
+   into the canvas and swaps the answer in place. Without it, the form posts and the
+   page renders server-side exactly as before. That fallback is a hard requirement,
+   not a nicety — it is what makes the nothing-vendored guarantee true. #}
+<script src="{{ asset('axis.js') }}" type="module"></script>
+</body>
+</html>

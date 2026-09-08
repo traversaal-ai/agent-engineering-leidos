@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Trace &middot; Axis{% endblock %}
+
+{# Every step of one run exactly as recorded, in the order it ran, with no arrangement —
+   and a list of the session's other runs beside it.
+
+   The steps are the authenticity guarantee. The canvas is this same data made readable;
+   this is the proof that the readable version is not a story, which is why it stays
+   reachable rather than being folded into the diagram it vouches for.
+
+   The list is what makes it a record rather than a snapshot: without it the page showed
+   the last run and nothing else, so an earlier question — or what indexing a document
+   had cost — was in the store and unreachable. #}
+
+{% block content %}
+<div class="page page--split">
+  <div class="page__main">
+    <header class="page__head">
+      <h1 class="page__title">Raw trace</h1>
+      <p class="page__lede">
+        Every step of one run, with its real prompts, completions, timings and costs.
+        The canvas is this data drawn; this is the data.
+      </p>
+    </header>
+
+    {% if trace %}
+    <div class="trace__head">
+      <span class="chip chip--strategy">{{ trace[0].strategy or 'indexing' }}</span>
+      <span class="chip">{{ trace | length }} steps</span>
+      <span class="muted">raw prompts and completions, in the order they ran</span>
+    </div>
+    <div class="trace">
+      {% for step in trace %}
+      {% include "_trace.html" %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">
+      Nothing has run yet. Upload a document or ask a question, and every step lands
+      here exactly as it was recorded.
+    </p>
+    {% endif %}
+  </div>
+
+  {% include "_tracelist.html" %}
+</div>
+{% endblock %}
