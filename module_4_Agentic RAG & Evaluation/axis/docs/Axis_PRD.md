@@ -149,6 +149,12 @@ project rather than starting from a blank file.
   switch between them, so that I can watch a demonstration on documents whose outcome is
   already measured and then try the same idea on material I actually care about, without
   losing either.
+- As an instructor, I want the hosted demo to sit behind a shared password so that a URL
+  I hand to a class cannot be found and used by anyone else to spend the API credits
+  behind it.
+- As a student, I want to report an answer as wrong against the run that produced it, so
+  that a bad answer becomes a run someone can reopen and read stage by stage rather than
+  a complaint nobody can act on.
 
 ### Should-have
 
@@ -575,6 +581,43 @@ grounded, and the difference is worth a minute of class.*
 - Given a fresh machine with only API keys configured, when Axis is started, then all
   three layers (Frontend, Backend, AI Backend) come up and pass the `/api/v1/health`
   check without any external service beyond the configured LLM/embedding/search providers.
+
+**A shared password in front of a hosted deployment**
+- Given a deployment with a password configured, when any path is requested without a
+  valid access cookie — a page, `/api/v1/*`, or a static asset — then a screen asking
+  for the password is returned and the application is not reached.
+- Given the correct password is submitted, when the screen is posted, then a signed
+  cookie is set that does not contain the password itself, and the application is
+  reached on the next request.
+- Given no password is configured, when Axis is started, then nothing is in the way —
+  the local `python -m axis` path is unchanged, and a deployment that lost the setting
+  fails open rather than locking an instructor out in front of a class.
+
+*Added when Axis was first hosted. It is a property of a deployment rather than of the
+product: the single-machine story above describes a laptop in a room, where the door is
+the room. A URL has no door, and the API keys behind it are the instructor's.*
+
+*Vercel's own password protection would have been the right place for it and is behind
+an add-on this account does not have — the API answers `428
+invalid_password_protection`. Its other built-in, Vercel Authentication, requires each
+visitor to hold an account with access to the team, which a class does not. So the gate
+is Axis's own, and it deliberately follows the one Module 3's Alex already uses.*
+
+**Reporting an answer as wrong**
+- Given a rendered answer, when a student looks at the bottom of it, then there is a
+  closed disclosure offering to report it, and opening it offers a fixed set of reasons
+  that name what is wrong rather than a free-text box alone.
+- Given a report is submitted, when it is recorded, then it carries the `trace_id` of
+  the run that produced the answer, so the run can be reopened at `/trace?id=…` and read
+  stage by stage.
+- Given a reason outside the offered set is posted, when it is recorded, then it is
+  stored as unspecified rather than echoed, and a free-text note is collapsed to one
+  bounded line so it cannot forge or bury the entries around it.
+
+*The sink is a structured log line, which is a floor rather than a finished feature and
+is recorded as such. The session store is `:memory:` on the hosted deployment and is
+erased with the instance, so a table of reports would quietly lose them; a durable sink
+is a database-shaped decision this does not pre-empt.*
 
 ---
 

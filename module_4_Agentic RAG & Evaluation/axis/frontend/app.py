@@ -132,6 +132,22 @@ def _inline_markdown(text: str | None) -> Markup:
     return Markup(out)
 
 
+# The reasons offered for a wrong answer. A closed list rather than a free-text box
+# alone, because "it was wrong" is not actionable and the four ways an answer here can
+# be wrong are genuinely different repairs: the retrieval missed, the retrieval was
+# fine and the prose is not supported by it, the answer is right as far as it goes, or
+# it refused something the documents do answer. Which one it is decides whether you
+# open Search or Generate in the trace, so asking costs the reporter one click and
+# saves the reader the whole run.
+FEEDBACK_REASONS = (
+    ("contradicts", "Wrong — it contradicts the documents"),
+    ("unsupported", "Unsupported — the citation does not say this"),
+    ("incomplete", "Incomplete — it missed part of the answer"),
+    ("refused", "It declined, but the documents do answer this"),
+)
+FEEDBACK_REASON_IDS = frozenset(value for value, _ in FEEDBACK_REASONS)
+
+
 def _asset_url(name: str) -> str:
     """`/static/<name>?v=<hash>` — the path a template should link.
 
@@ -198,6 +214,11 @@ def create_app(
     # makes "reload and the fix is there" reliable, which in a tool driven live in front
     # of a class is not a nicety.
     templates.env.globals["asset"] = _asset_url
+    # A global rather than a key in each context. `_answer.html` is included from the
+    # canvas, from Compare and from the pain-point result, and a control that renders
+    # on two of those three is worse than one that renders nowhere — the reporter
+    # learns it exists and then cannot find it.
+    templates.env.globals["feedback_reasons"] = FEEDBACK_REASONS
     # `| md` in place of `| e` wherever model prose is shown. It escapes internally,
     # so it is not an opt-out of autoescaping — see `_inline_markdown`.
     templates.env.filters["md"] = _inline_markdown
@@ -1402,6 +1423,54 @@ def create_app(
             max_age=resolved.server.session_token_ttl_seconds,
         )
         return response
+
+    @app.post("/feedback")
+    async def record_feedback(
+        request: Request,
+        trace_id: str = Form(""),
+        strategy: str = Form(""),
+        reason: str = Form(""),
+        note: str = Form(""),
+    ) -> Response:
+        """Record that an answer was wrong, against the run that produced it.
+
+        **`trace_id` is the whole point.** A report that says only "the answer was
+        wrong" is a sentence; one carrying the trace id is a run you can reopen at
+        `/trace?id=…` and read stage by stage — which retrieval returned, what the
+        prompt was, what the model did with it. That is the difference between
+        feedback and a complaint, and it is why this is a control on the answer
+        rather than a mail link.
+
+        **Where it goes is a structured log line, and that is a deliberate floor
+        rather than a finished feature.** It is durable in the one place that
+        survives this deployment — `vercel logs`, or the terminal under
+        `python -m axis` — whereas the session store it would otherwise go to is
+        `:memory:` in production and is erased with the instance, so a table of
+        reports would quietly lose them. A real sink is a database-shaped decision;
+        this is honest about being the smallest thing that keeps the report.
+
+        A form post with a redirect, so it works with scripts disabled, like every
+        other control here.
+        """
+        # Bounded before it is logged. `note` is whatever a reporter typed, and a log
+        # line is read by a person in a terminal — an unbounded one is a denial of
+        # service against the reader, and newlines in it would forge log entries.
+        cleaned = " ".join((note or "").split())[:500]
+        chosen = reason if reason in FEEDBACK_REASON_IDS else "unspecified"
+        logger.warning(
+            "answer reported as wrong: reason=%s strategy=%s trace_id=%s note=%r",
+            chosen,
+            (strategy or "unknown")[:40],
+            (trace_id or "unknown")[:64],
+            cleaned,
+        )
+        # Back to the page it was reported from — the answer block renders on Run,
+        # Compare and Why-agentic — rather than always to `/`. `_back_here` may already
+        # carry `?point=`, so the separator is chosen rather than assumed.
+        back = _back_here(request)
+        joiner = "&" if "?" in back else "?"
+        note_text = quote("Thanks — logged against this run's trace.")
+        return RedirectResponse(f"{back}{joiner}flash={note_text}", status_code=303)
 
     @app.post("/cache")
     async def set_cache(request: Request, on: str = Form("")) -> Response:

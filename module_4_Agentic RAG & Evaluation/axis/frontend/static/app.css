@@ -3935,3 +3935,62 @@ button.prediction:hover {
   font: 400 1rem/1.6 var(--font-body);
   font-style: italic;
 }
+
+/* -- reporting a wrong answer ------------------------------------------------
+ *
+ * Small, closed, and last. An answer a class is reading should not carry a
+ * complaint form across the bottom of it — but a wrong answer is the most useful
+ * thing that can happen in a teaching demo, and it is worthless if the run that
+ * produced it cannot be found again. So: one line of small text until someone has
+ * something to say. */
+.answer__feedback {
+  margin-top: 1.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule-soft);
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+.answer__feedback > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink-muted);
+}
+.answer__feedback > summary::-webkit-details-marker { display: none; }
+.answer__feedback > summary::before {
+  content: "\203A";
+  display: inline-block;
+  width: 1em;
+  transition: transform 120ms ease;
+}
+.answer__feedback[open] > summary::before { transform: rotate(90deg); }
+.answer__feedback > summary:hover { color: var(--ink); }
+
+.feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+.feedback__field { display: flex; flex-direction: column; gap: 0.25rem; flex: 1 1 14rem; }
+.feedback__label { font-size: 0.75rem; color: var(--ink-muted); }
+.feedback select,
+.feedback input[type="text"] {
+  width: 100%;
+  padding: 0.35rem 0.45rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm);
+}
+/* The whole row wraps on a narrow screen, and the note is the field that should
+ * take the extra width when it does. */
+.feedback__where {
+  flex: 1 1 100%;
+  margin: 0.25rem 0 0;
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+}
+.feedback__where code { font: 400 0.72rem/1 var(--font-mono); }

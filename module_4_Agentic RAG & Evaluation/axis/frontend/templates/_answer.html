@@ -80,4 +80,41 @@
     trace below shows what was searched and how close it came.
   </p>
   {% endif %}
+
+  {# **Closed by default, and small.** An answer a class is reading should not carry a
+     complaint form across the bottom of it — but a wrong answer is the most useful
+     thing that can happen in this room, and it is worthless if the run that produced
+     it cannot be found afterwards. So the control is a disclosure: one line of small
+     text until someone has something to say, and a `trace_id` on the way out.
+
+     A plain form post. Reporting a bad answer must not be the one thing that needs
+     JavaScript. #}
+  {% if feedback_reasons %}
+  <details class="answer__feedback">
+    <summary>Something wrong with this answer?</summary>
+    <form class="feedback" method="post" action="/feedback">
+      <input type="hidden" name="trace_id" value="{{ answer.trace_id | e }}">
+      <input type="hidden" name="strategy" value="{{ answer.strategy | e }}">
+      <label class="feedback__field">
+        <span class="feedback__label">What is wrong with it</span>
+        <select name="reason">
+          {% for value, label in feedback_reasons %}
+          <option value="{{ value | e }}">{{ label | e }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="feedback__field">
+        <span class="feedback__label">Anything to add <span class="muted">(optional)</span></span>
+        <input type="text" name="note" maxlength="500"
+               placeholder="What should it have said?">
+      </label>
+      <button type="submit" class="button--small">Report</button>
+      <p class="feedback__where">
+        Recorded against this run&rsquo;s trace
+        <code>{{ answer.trace_id[:8] | e }}</code>, so it can be reopened and read
+        stage by stage.
+      </p>
+    </form>
+  </details>
+  {% endif %}
 </article>

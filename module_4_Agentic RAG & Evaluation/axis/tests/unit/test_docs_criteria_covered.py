@@ -50,6 +50,11 @@ STORY_KEYWORDS_TO_MODULE = {
     ("follow-up question",): "test_ac_conversation_memory.py",
     ("reworded repeat",): "test_ac_semantic_cache.py",
     ("hold the demo corpus",): "test_ac_corpus_switching.py",
+    # Two stories, one module. They arrived together with the first hosted
+    # deployment and are unrelated except in that: a shared door on the URL, and a
+    # way to report what comes back through it.
+    ("shared password",): "test_ac_feedback_and_gate.py",
+    ("report an answer as wrong",): "test_ac_feedback_and_gate.py",
 }
 
 
