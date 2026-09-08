@@ -513,17 +513,56 @@ def create_app(
 
     # -- session ----------------------------------------------------------
 
+    async def _session_is_live(request: Request, session_id: str, token: str) -> bool:
+        """Whether the session this cookie names still exists.
+
+        **A cookie is a claim, not a session.** It outlives the store it refers to in
+        two ordinary ways: the process restarted, or — on the hosted deployment, where
+        the store is `:memory:` — the instance that held it was recycled and the next
+        request landed on a fresh one. The browser keeps presenting the old id either
+        way, and it is a perfectly well-formed id for a session that is gone.
+
+        Trusting it produced an `Internal Server Error` on the deployment. Every route
+        passed the id straight through, the Backend answered `401 Unauthorized` because
+        no such session exists, and `raise_for_status()` turned that into a 500 — so a
+        student who left a tab open came back to a stack trace and no way out of it but
+        clearing cookies, which is not something to ask of a class.
+
+        One in-process call, not a network hop: the Frontend reaches the Backend over
+        `httpx.ASGITransport` (`axis/asgi.py`), so this is a function call wearing HTTP
+        semantics.
+
+        Only `401` and `404` mean *gone*. Any other failure is treated as transient and
+        the session is kept — minting a new one because the Backend hiccuped would
+        abandon a student's uploads over a blip.
+        """
+        try:
+            await request.app.state.backend.get_session(session_id, token=token)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (401, 404):
+                logger.info(
+                    "Session %s is no longer known; starting a fresh one.", session_id
+                )
+                return False
+            return True
+        except httpx.HTTPError:
+            return True
+        return True
+
     async def _session(request: Request) -> tuple[str, str, dict[str, str]]:
-        """The caller's session, created on first use.
+        """The caller's session, created on first use — or on first use after it went.
 
         Held in a cookie rather than in server memory so a page reload keeps the
         same workspace and its uploaded documents. `httponly` because no script
         needs to read it, and the token is the only thing standing between one
         student's documents and another's (System Design Section 6.4).
+
+        The cookie is **checked** rather than taken at face value; see
+        `_session_is_live` for what a stale one used to do.
         """
         session_id = request.cookies.get(_SESSION_COOKIE)
         token = request.cookies.get(_TOKEN_COOKIE)
-        if session_id and token:
+        if session_id and token and await _session_is_live(request, session_id, token):
             return session_id, token, {}
 
         created = await request.app.state.backend.create_session()
