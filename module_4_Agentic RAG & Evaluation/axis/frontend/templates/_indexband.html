@@ -1,0 +1,24 @@
+{# The index, belonging to neither track.
+
+   Extracted from `_canvas.html` when Indexing moved to its own page: the band has to
+   render between the two tracks when both are drawn and above the answering track when
+   only it is, and one partial included twice is the way to do that without two copies
+   of the markup drifting apart.
+
+   Deliberately not joined to the Search card by a drawn elbow: Search moves the moment
+   an agentic strategy is selected, and an arrow pointing at where a card used to be
+   reads as broken rather than as moved. The band lights up while a search runs instead.
+
+   Expects `indexed`. #}
+<div class="indexband" data-filled="{{ 'true' if indexed else 'false' }}">
+  <span class="indexband__label">
+    the index
+    {%- if indexed %} &middot; {{ indexed }} vector{{ '' if indexed == 1 else 's' }}{% endif %}
+  </span>
+  <span class="indexband__dots" aria-hidden="true">
+    {%- for i in range([indexed, 60] | min) -%}<span></span>{%- endfor -%}
+  </span>
+  <span class="indexband__note">
+    {{- 'written by Store, read by Search' if indexed else 'nothing stored yet' -}}
+  </span>
+</div>

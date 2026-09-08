@@ -40,8 +40,9 @@ class ModelPrice:
         self.output = Decimal(output_per_mtok)
 
 
-# Prices in USD per 1M tokens. Last reviewed: see the warning above — treat any
-# figure here as needing confirmation before you rely on it for a budget.
+# Prices in USD per 1M tokens. Anthropic rows last verified 2026-09-08 against
+# claude.com/pricing; every other row is older than that. Treat any figure here as
+# needing confirmation before you rely on it for a budget.
 PRICES: dict[str, ModelPrice] = {
     # ---- OpenAI, chat -----------------------------------------------------
     "gpt-4o": ModelPrice("2.50", "10.00"),
@@ -50,8 +51,16 @@ PRICES: dict[str, ModelPrice] = {
     "text-embedding-3-small": ModelPrice("0.02"),
     "text-embedding-3-large": ModelPrice("0.13"),
     # ---- Anthropic, chat -------------------------------------------------
-    "claude-opus-5": ModelPrice("15.00", "75.00"),
-    "claude-sonnet-5": ModelPrice("3.00", "15.00"),
+    # Verified against claude.com/pricing on 2026-09-08. The first three figures here
+    # were Opus 5 at 15/75 and Sonnet 5 at 3/15 — the previous generation's rate card,
+    # carried over unchanged. Sonnet 5 is the model Axis is configured with, so every
+    # cost the product showed was 1.5x the real one, on the one screen whose entire
+    # claim is that the cost of orchestration is measured rather than asserted.
+    "claude-opus-5": ModelPrice("5.00", "25.00"),
+    "claude-sonnet-5": ModelPrice("2.00", "10.00"),
+    # Both spellings. The undated id is the one the current docs give and the one a
+    # student will paste into `.env`; the dated one was here first and still resolves.
+    "claude-haiku-4-5": ModelPrice("1.00", "5.00"),
     "claude-haiku-4-5-20251001": ModelPrice("1.00", "5.00"),
     # ---- Local models ----------------------------------------------------
     # Genuinely free at the API boundary, which is the whole appeal of the

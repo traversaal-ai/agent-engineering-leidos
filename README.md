@@ -26,11 +26,11 @@ Every module in this repo works the same way: learn the concept, then build it, 
 | **6** | Guardrails, Evaluations & Reliability | Add safety, compliance, and injection guardrails. Test accuracy, tool use, and failure cases. Monitor regressions with judges and human review. |
 | **7** | Demo Day | Showcase what you built. See [Demo Day](#demo-day) below for the format. |
 
-## Two apps you can open right now
+## Three apps you can open right now
 
-Most of this repo is built by you, in the session. Module 3 also ships two
-finished apps, because some things are faster to show than to describe. Both are
-deployed and both run locally.
+Most of this repo is built by you, in the session. Modules 3 and 4 also ship
+finished apps, because some things are faster to show than to describe. The first
+two are deployed; all three run locally.
 
 ### Alex — [`module_3_Enterprise RAG/`](module_3_Enterprise%20RAG/)
 
@@ -66,6 +66,32 @@ Live: **https://alex-enterprise-rag.vercel.app/lab**
 Both sit behind one password, because live model credentials sit behind them —
 your facilitator has it. Running them locally needs no password at all; each
 module README has the commands.
+
+### Axis — [`module_4_Agentic RAG & Evaluation/axis/`](module_4_Agentic%20RAG%20&%20Evaluation/axis/)
+
+The same question, run through two RAG strategies, with the bill shown. Naive RAG
+and Agentic RAG read the same documents through the same index with the same
+embedding model and the same synthesis prompt, so the only thing that differs
+between two runs is the orchestration in front of retrieval — a router, a
+decomposer, a query rewriter, a semantic cache and a bounded ReAct loop on one
+side, and a single retrieve-then-answer pass on the other.
+
+Ask it `When is payment due on a correct invoice?` and the agentic run pays three
+times as much for the identical answer. Ask it `Compare the master agreement's
+overall ceiling with SOW-003's not-to-exceed value` and the naive run retrieves
+**nothing above threshold** — a two-part question embedded as one vector lands
+between both documents and clears neither, while each half on its own scores a
+perfect match. That pair is the whole argument: agency has a price and a payoff,
+and Axis is built so you can see both instead of taking either on faith.
+
+It indexes the same ACME Aerospace documents Alex does, so questions land on
+material the room already recognises. The *Why agentic* page demonstrates each of
+the four ways plain retrieval fails with the different mechanism that answers it,
+and every figure on it is bound to a question the evaluation harness verifies.
+
+Local only, and deliberately: it holds its own SQLite and vector index, fetches
+nothing from a CDN, and works with the network unplugged. Setup is in the
+[module README](module_4_Agentic%20RAG%20&%20Evaluation/).
 
 ## Demo Day
 
@@ -126,7 +152,7 @@ cd agent-engineering-leidos
 1. **Read the study material first.** Every module's `study-material/lesson.md` teaches the concepts before you touch a tool.
 2. **Do the hands-on part for real.** Nothing in this course is a toy exercise you copy-paste through. Module 1, for example, has you generate an actual PRD for an actual idea, then build an actual app from it.
 3. **Use `reference/` when you want more depth** than the lesson gives, on things like agent architecture levels or the Claude Code construct anatomy.
-4. **Keep it local first.** No deployment, no backend, no accounts required to complete any module's hands-on work, unless a specific module's content calls for it. The two deployed apps above are there so you can see the finished thing before you build one; everything they do, they do the same way on your laptop.
+4. **Keep it local first.** No deployment, no backend, no accounts required to complete any module's hands-on work, unless a specific module's content calls for it. The finished apps above are there so you can see the whole thing before you build one; everything they do, they do the same way on your laptop — and Axis only runs that way.
 
 ## Who's teaching this
 

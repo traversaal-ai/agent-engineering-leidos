@@ -73,6 +73,14 @@
      action in the product should not be a one-click side effect of the document list. #}
   <nav class="topnav">
     <a href="/" {% if nav == 'run' %}aria-current="page"{% endif %}>Run</a>
+    {# Second, and directly after Run because it is the phase that precedes every run.
+       It was drawn *on* the Run page until it became clear the two phases run on
+       different clocks: indexing happens once per document, answering once per
+       question, and redrawing the settled phase above every question cost half the
+       board and squeezed the answering stages past legibility. A link rather than a
+       track is the honest shape — you visit it when you want to know what happened to
+       a file, not while you are asking questions of it. #}
+    <a href="/indexing" {% if nav == 'indexing' %}aria-current="page"{% endif %}>Indexing</a>
     <a href="/compare" {% if nav == 'compare' %}aria-current="page"{% endif %}>Compare</a>
     <a href="/trace" {% if nav == 'trace' %}aria-current="page"{% endif %}>Trace</a>
     {# Fifth, after the three readings of a run and before Summarize. Run, Compare and
@@ -139,7 +147,11 @@
 
    `shell--bare` is gone with it: every page now has the two-column grid. #}
 {% set can_run = nav in ('run', 'why') %}
-{% set can_setup = nav in ('run', 'summarize') %}
+{# Which pages draw the document group in the rail. Indexing joined them when the
+   indexing track moved onto its own page: that group *is* the track's selector — it
+   chooses which document the four stages describe — so the page drawing the stages
+   has to draw the picker too, or the selection has no control on the page it affects. #}
+{% set can_setup = nav in ('run', 'summarize', 'indexing') %}
 <div class="shell">
 
   <aside class="rail">
@@ -344,7 +356,11 @@
           {% if selectable %}
           <a class="documents__name documents__name--pick
                     {{ 'documents__name--on' if doc.document_id == selected_document }}"
-             href="/?document={{ doc.document_id }}"
+             {# Points at the indexing page, which is where the track it selects now
+                lives. It pointed at `/` until the two phases were split, and left
+                pointing there it would set a selection on a page that no longer draws
+                the thing being selected. #}
+             href="/indexing?document={{ doc.document_id }}"
              {% if doc.document_id == selected_document %}aria-current="true"{% endif %}>
             <span class="dot dot--{{ doc.status }}"></span>
             {{ doc.filename | e }}

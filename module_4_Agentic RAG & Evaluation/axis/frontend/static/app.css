@@ -474,7 +474,15 @@ body {
     flex: 1;
     min-height: 0;
     display: flex;
-    overflow: hidden;
+    /* **The scroller.** It was `hidden`, which was correct while the board was a
+       fixed two-track diagram sized to fit — nothing was ever supposed to overflow,
+       so hiding overflow enforced that. It stopped being correct once the answer took
+       the top of this column and the stages became a stacked list underneath: the
+       content is now taller than the space on purpose, and hiding the overflow simply
+       cut the last stage in half. `min-height: 0` above is what lets it actually
+       shrink inside its flex track rather than pushing the ask bar off screen. */
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 }
 
@@ -3625,4 +3633,305 @@ button.prediction:hover {
   font-size: 0.82rem;
   line-height: 1.6;
   color: var(--money);
+}
+
+/* ══ The Answering track as collapsible rows ═══════════════════════════════════
+   Six stages in one flex row could not be read. Opening any one of them gave it
+   `flex: 3` and left the other five at `flex: 1` — about 80px each — so their names
+   clipped to "Re…", "Ro…", "De…" and their miniatures became texture. A student was
+   shown a diagram of a pipeline whose stages had no names.
+
+   So this track stacks instead: one full-width row per stage, the row itself a
+   header and its miniature side by side. Width stops being the scarce resource, and
+   the number the stage produced sits on the same line as the stage's name.
+
+   **The miniature stays on the collapsed row**, which is the whole constraint here —
+   `test_every_stage_draws_its_data_without_being_clicked` exists because a rail of
+   names with the data behind a click was built once already and taught nothing. A
+   collapsible row that collapses to *only* a name is that rail. These collapse to a
+   name, its cost, its duration, and what it produced.
+
+   Scoped to `.track--query`. Indexing keeps the left-to-right pipeline: four cards
+   read fine at a quarter of the board each, and the two phases having different
+   rhythms is honest — one runs per document, the other per question. */
+
+.track--query .track__cards {
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* No longer competing for width, so no `flex: 1` and no floor of zero. */
+.track--query .cardslot {
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* The connector turns ninety degrees: a short dashed drop between rows rather than a
+   long dash across to the next card. Indented to sit under the stage number, so the
+   chain reads down the left edge where the numbers are. */
+.track--query .cardslot::after {
+  flex: 0 0 0.5rem;
+  align-self: flex-start;
+  width: var(--line);
+  height: 0.5rem;
+  margin: 0 0 0 1.1rem;
+  background-image: linear-gradient(
+    to bottom,
+    var(--ink-faint) 0 5px,
+    transparent 5px 10px
+  );
+  background-size: var(--line) 10px;
+  background-repeat: repeat-y;
+}
+
+/* The arrowhead points down. Same trick as the horizontal one for the same reason —
+   the border box is `--head` tall with its apex on the bottom edge, which is exactly
+   where the dashed drop stops, so the head reads as joined to its own line. */
+.track--query .track__cards > .cardslot:not(:last-child)::before {
+  right: auto;
+  left: 1.1rem;
+  top: auto;
+  bottom: 0;
+  margin-top: 0;
+  margin-left: calc(-1 * var(--head));
+  border-width: var(--head) var(--head) 0 var(--head);
+  border-left-color: transparent;
+  border-top-color: var(--ink-faint);
+}
+
+/* Header left, miniature right, both on one line. The header column is fixed rather
+   than `auto` so the six rows agree on where the miniature starts — a ragged left
+   edge on the data is the thing that made the old row hard to scan. */
+.track--query .card {
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+  grid-template-rows: auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.7rem;
+}
+
+/* Metrics sit right-aligned at the end of the header column, so cost and duration
+   line up down the track and can be compared between stages at a glance. */
+.track--query .card__head {
+  grid-column: 1;
+  align-items: center;
+}
+
+/* A miniature drawn for a tall narrow card, laid on its side. Capped rather than
+   scaled: the point of it on a collapsed row is "this stage produced something, and
+   roughly this much of it", and the expanded row is where it is read properly. */
+.track--query .card:not([data-expanded]) .art {
+  max-height: 2.9rem;
+  overflow: hidden;
+}
+
+/* The pending/running sentence is the row's content when there is no data yet, so it
+   goes where the miniature would have been rather than under the name. */
+.track--query .card:not([data-expanded]) .card__why {
+  grid-column: 2;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Expanded: one column, everything stacked under the header, full board width. This
+   is the payoff of stacking — an opened stage no longer has to buy its width from its
+   neighbours, so nothing else on the track changes size when you open one. */
+.track--query .card[data-expanded] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto;
+  align-items: start;
+  padding: 0.5rem 0.7rem 0.7rem;
+}
+.track--query .card[data-expanded] .card__head { grid-column: 1; }
+
+/* Neutralise the width-trading rules, which have nothing to trade in a column. Their
+   effect here was to hide the metrics on every unopened row — the opposite of the
+   point, now that there is room for them. */
+.track--query .cardslot:has(.card[data-expanded]),
+.track--query[data-open] .cardslot:not(:has(.card[data-expanded])) {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.track--query[data-open] .cardslot:not(:has(.card[data-expanded])) .card__metrics {
+  display: block;
+}
+
+/* Room to breathe on the name now that it is not fighting for a sixth of the board. */
+.track--query .card__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ══ A board with one track ════════════════════════════════════════════════════
+   The grid reserves three rows — track, index band, track — which is right when both
+   phases are drawn and wrong the moment one of them moved to its own page: the two
+   rows belonging to the absent track and the band stayed reserved, so the stages sat
+   in the top third above a screen of empty dotted ground. Rows sized to content, and
+   the track stops stretching to fill a height nothing is using. */
+/* **Both selectors, and the second is the one that matters.** The open-track rule is
+   `.canvasboard:has(.track--query[data-open])`, and `:has()` takes the specificity of
+   its argument — so that rule is (0,3,0) and beats a plain `[data-single]` at (0,2,0)
+   no matter which comes later in the file. Written alone, this had no effect at all
+   the moment a card was opened: the board kept three rows, `213px 0px 320px`, and the
+   answering track was squeezed into the first while the third stood empty for the
+   track that had moved to its own page. The expanded card was 378px tall inside a
+   190px viewport, so the answer was clipped to one line of its own description. */
+.canvasboard[data-single],
+.canvasboard[data-single]:has(.track--query[data-open]) {
+  grid-template-rows: auto;
+  align-content: start;
+}
+.canvasboard[data-single] .track,
+.canvasboard[data-single]:has(.track--query[data-open]) .track {
+  grid-template-rows: auto auto;
+}
+/* **No max-height, and no inner scroller.** This is where the scrolling belongs and
+   this is not it: `.canvaswrap` and `.canvas` are both `overflow: hidden`, so a track
+   that grew past the space the answer left it was *clipped* by its ancestors rather
+   than scrolled by itself — the sixth row was cut in half with no way to reach it.
+   Capping it here also fought the answer above it for height, so the cap was right on
+   one screen and wrong on the next.
+
+   The column scrolls instead — see `.canvaswrap` below. One scroller, at the level
+   that owns the whole content, which is what stops nested scrollbars and what makes
+   "scroll down to the last stage" work the way a reader expects. */
+.canvasboard[data-single] .track__cards {
+  overflow: visible;
+  max-height: none;
+}
+
+/* ══ The ask bar ═══════════════════════════════════════════════════════════════
+   Asking a question is the thing a student is always about to do, and it had been
+   flattened into a single line pinned to the bottom edge — the least prominent
+   element on a screen whose whole purpose it is. Alex gives its composer real height
+   and so does this: three lines of room, a larger face, and the button sized to
+   match rather than tucked beside it. */
+.askbar {
+  gap: 0.6rem 0.75rem;
+  padding: 1rem 2rem 1.1rem;
+}
+.askbar textarea {
+  min-height: 4.6rem;
+  padding: 0.75rem 0.9rem;
+  font: 400 1.05rem/1.5 var(--font-body);
+  /* `field-sizing: content` grows it as a long question is typed; the floor above is
+     what it looks like empty, which is when a student is deciding whether to type. */
+}
+.askbar button[type="submit"]:not(.prediction) {
+  align-self: stretch;
+  min-width: 6.5rem;
+  padding: 0.75rem 1.4rem;
+  font-size: 1rem;
+}
+/* The labelled presets read as three offered questions rather than as a scrollbar's
+   worth of chips, now that there is room above them. */
+.askbar__presets .prediction {
+  padding: 0.4rem 0.7rem;
+}
+
+/* ══ The answer, and the pipeline as thinking ══════════════════════════════════
+   The answer used to be a pane inside the Generate card — the thing the student
+   asked for, rendered at diagram size, inside a track that scrolled it out of view.
+   It leads now, and the stages sit under it in a disclosure the way a model's
+   reasoning does.
+
+   The hierarchy is the argument: on a question-answering tool the answer is the
+   product and the pipeline is how it was reached. Axis still cares more than most
+   about the second half, which is why the disclosure is open by default rather than
+   closed — but open and *secondary* is a different claim from equal. */
+
+.canvaswrap > .answer {
+  flex: 0 0 auto;
+  margin: 0 0 0.75rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--strategy);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.canvaswrap > .answer .answer__text {
+  font: 400 1.1rem/1.6 var(--font-body);
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+.canvaswrap > .answer .answer__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+/* An answer with no citations is the system declining, not failing — so it reads as
+   a considered refusal rather than an error. */
+.canvaswrap > .answer--ungrounded {
+  border-left-color: var(--ink-faint);
+}
+
+.thinking {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.thinking__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.4rem 0.2rem 0.5rem;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink-muted);
+  border-bottom: 1px solid var(--rule-soft);
+  margin-bottom: 0.5rem;
+}
+.thinking__summary::-webkit-details-marker { display: none; }
+/* The marker is drawn rather than inherited, so it rotates with the state and reads
+   at projector distance. */
+.thinking__summary::before {
+  content: "";
+  flex: none;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dur-base) var(--ease);
+}
+.thinking[open] > .thinking__summary::before { transform: rotate(45deg); }
+.thinking__label {
+  font: 500 0.8rem/1.3 var(--font-body);
+  letter-spacing: 0.01em;
+}
+.thinking__hint {
+  font: 400 0.68rem/1.4 var(--font-mono);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.thinking > .canvasboard { flex: 1 1 auto; min-height: 0; }
+/* Closed, the board contributes no height at all — otherwise the flex parent keeps
+   its row and the ask bar stays pushed down for a diagram nobody is looking at. */
+.thinking:not([open]) > .canvasboard { display: none; }
+/* The wrap is now a column: answer, then the disclosure holding the board. */
+.canvaswrap { flex-direction: column; }
+
+/* The placeholder that stands in for the previous answer while a new one is being
+   produced — see `resetQueryStages` in axis.js. It holds roughly the answer's space so
+   the column does not jump, and it names the question so a reader knows which one it
+   is waiting on. Muted and italic: it is the one thing on this page that is not a
+   measurement. */
+.canvaswrap > .answer--waiting {
+  margin: 0 0 0.75rem;
+  padding: 1rem 1.15rem;
+  border: 1px dashed var(--rule);
+  border-left: 3px solid var(--ink-faint);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-muted);
+  font: 400 1rem/1.6 var(--font-body);
+  font-style: italic;
 }

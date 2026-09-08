@@ -5,8 +5,10 @@
    read, and a number a student has to go looking for is a number they will not
    compare.
 
-   `| e` on everything: the answer is LLM output derived from uploaded documents,
-   which is untrusted input (System Design Section 6.5, priority 4). #}
+   Everything here is escaped: the answer is LLM output derived from uploaded
+   documents, which is untrusted input (System Design Section 6.5, priority 4). The
+   answer body goes through `| md` instead of `| e`, which escapes first and then adds
+   inline emphasis — so it is the same guarantee, not a weaker one. #}
 
 <article class="answer answer--{{ 'grounded' if answer.grounded else 'ungrounded' }}">
   <header class="answer__head">
@@ -20,7 +22,12 @@
     </span>
   </header>
 
-  <div class="answer__text">{{ answer.answer | e }}</div>
+  {# `| md` rather than `| e`, and it is not a loosening: `_inline_markdown` escapes
+     the text first and only then wraps already-inert spans in <strong>, <em> and
+     <code>. Models emit "**Net 45**" whether asked to or not, and rendering that as
+     literal asterisks made every answer look pasted out of a terminal. No block
+     syntax and no links — see the filter for why. #}
+  <div class="answer__text">{{ answer.answer | md }}</div>
 
   {# PRD Section 6: web citations must be visually distinguishable from document
      ones, "so a student can never mistake 'my documents said this' for 'a search

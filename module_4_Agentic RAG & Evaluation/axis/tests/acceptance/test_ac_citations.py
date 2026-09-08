@@ -207,3 +207,125 @@ async def test_every_strategy_cites(
 
     assert body["grounded"] is True
     assert len(body["citations"]) >= 1, f"{strategy.value} returned no citations"
+
+
+# -- the markers in the prose and the numbers on the list must agree -------
+
+
+def test_a_marker_is_renumbered_to_match_the_list_it_is_shown_with() -> None:
+    """A model citing [1] and [4] must not be rendered beside a list numbered [1] [2].
+
+    The bug this fixes, found on screen: the citation list is built in order of first
+    appearance and rendered from the template's own loop index, so two markers spread
+    across five passages produced a two-entry list labelled [1] [2] while the prose
+    still said [1] and [4]. The content was right — entry [2] really was passage 4 —
+    and the numbering was a lie. A student following [4] found no [4].
+
+    That is the worst shape a citation bug can take here, because it is invisible
+    unless you count: the answer looks cited, the source is genuinely the right one,
+    and the one thing that does not work is the act of following it.
+    """
+    from ai_backend.contracts.models import Chunk
+    from ai_backend.pipelines.grounding import passages_from, resolve_citations
+
+    chunks = [
+        Chunk(
+            id=f"c{n}",
+            document_id=f"doc{n}",
+            content=f"passage {n} body",
+            source_location=f"section {n}",
+            score=0.9,
+        )
+        for n in range(1, 6)
+    ]
+    passages = passages_from(chunks, [])
+
+    text, citations = resolve_citations(
+        "The first claim [1]. The fourth claim [4].", passages
+    )
+
+    # Two entries, in the order the reader meets them.
+    assert len(citations) == 2
+    assert citations[0].source_location == "section 1"
+    assert citations[1].source_location == "section 4"
+    # And the prose now points at those positions rather than at the model's.
+    assert text == "The first claim [1]. The fourth claim [2]."
+
+
+def test_a_marker_outside_the_passages_is_removed_from_the_prose() -> None:
+    """A hallucinated [9] leaves no dangling marker behind.
+
+    Dropping it from the list while leaving it in the text is the same defect as
+    above from the other direction: a marker a reader can see and cannot follow.
+    """
+    from ai_backend.contracts.models import Chunk
+    from ai_backend.pipelines.grounding import passages_from, resolve_citations
+
+    chunks = [
+        Chunk(
+            id="c1",
+            document_id="doc1",
+            content="only passage",
+            source_location="section 1",
+            score=0.9,
+        )
+    ]
+    text, citations = resolve_citations(
+        "A real claim [1]. An invented one [9].", passages_from(chunks, [])
+    )
+
+    assert len(citations) == 1
+    assert "[9]" not in text
+    assert text == "A real claim [1]. An invented one."
+
+
+def test_two_markers_for_one_passage_collapse_onto_one_number() -> None:
+    """Repeating a source does not create a second entry for it."""
+    from ai_backend.contracts.models import Chunk
+    from ai_backend.pipelines.grounding import passages_from, resolve_citations
+
+    chunks = [
+        Chunk(
+            id=f"c{n}",
+            document_id=f"doc{n}",
+            content=f"passage {n}",
+            source_location=f"section {n}",
+            score=0.9,
+        )
+        for n in (1, 2)
+    ]
+    text, citations = resolve_citations(
+        "First [2]. Again [2]. Other [1].", passages_from(chunks, [])
+    )
+
+    assert len(citations) == 2
+    assert citations[0].source_location == "section 2"
+    assert text == "First [1]. Again [1]. Other [2]."
+
+
+def test_renumbering_does_not_reflow_the_rest_of_the_answer() -> None:
+    """Tidying a dropped marker must not touch whitespace anywhere else.
+
+    `.answer__text` is `pre-wrap`, so the indentation a model puts on a sub-list or a
+    column of figures is load-bearing — it is the whole reason block markdown is not
+    parsed. The first version of the cleanup ran `[ \t]{2,}` over the entire answer to
+    close the gap a removed marker left, which reflowed every one of those, in answers
+    that had no bad marker in them at all.
+    """
+    from ai_backend.contracts.models import Chunk
+    from ai_backend.pipelines.grounding import passages_from, resolve_citations
+
+    chunks = [
+        Chunk(
+            id="c1",
+            document_id="doc1",
+            content="terms",
+            source_location="section 1",
+            score=0.9,
+        )
+    ]
+    original = "Payment terms [1]:\n  - Net 45\n  - Late fee  1.5% monthly"
+
+    text, _ = resolve_citations(original, passages_from(chunks, []))
+
+    assert text == "Payment terms [1]:\n  - Net 45\n  - Late fee  1.5% monthly"

@@ -466,6 +466,72 @@ async def test_anthropic_lifts_the_system_prompt_out_of_the_messages() -> None:
     assert [m["role"] for m in payload["messages"]] == ["user"]
 
 
+@pytest.mark.parametrize(
+    "model,accepted",
+    [
+        ("claude-sonnet-5", False),
+        ("claude-opus-5", False),
+        ("claude-opus-4-8", False),
+        ("claude-opus-4-7", False),
+        ("claude-fable-5-1", False),
+        ("claude-mythos-5-1", False),
+        ("claude-opus-4-6", True),
+        ("claude-sonnet-4-6", True),
+        ("claude-haiku-4-5", True),
+    ],
+)
+def test_the_temperature_cut_is_at_the_models_that_reject_it(
+    model: str, accepted: bool
+) -> None:
+    """Which models still take `temperature`, pinned on both sides of the line.
+
+    Anthropic removed the sampling parameters as of Opus 4.7 and answers a request
+    carrying one with HTTP 400 rather than ignoring it — so with `temperature=0.0`
+    hardcoded in both pipelines, every call on such a model failed outright. The first
+    fix listed the three Claude 5 ids, which is where the 400 had been met, and left
+    `claude-opus-4-8` and `claude-opus-4-7` failing exactly as `claude-sonnet-5` had.
+
+    Kept where it is honoured, because Axis asks for 0.0 deliberately: a demo that
+    answers differently on a re-run of the same question makes the two strategies look
+    like they differ when only the sampling did.
+    """
+    from ai_backend.providers.anthropic_provider import _accepts_temperature
+
+    assert _accepts_temperature(model) is accepted
+
+
+@respx.mock
+async def test_anthropic_does_not_put_temperature_on_the_wire_for_claude_5() -> None:
+    """And the check is actually wired into the request, not just available."""
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(200, json=_ANTHROPIC_BODY)
+    )
+    provider = AnthropicLLMProvider(model="claude-sonnet-5", api_key="sk-ant-test")
+
+    await provider.complete(
+        [Message(role=Role.USER, content="How long is leave?")], temperature=0.0
+    )
+
+    assert "temperature" not in json.loads(route.calls.last.request.content)
+
+
+@respx.mock
+async def test_anthropic_still_sends_temperature_where_it_is_honoured() -> None:
+    """The other half: dropping it everywhere would cost the demo its determinism."""
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(200, json=_ANTHROPIC_BODY)
+    )
+    provider = AnthropicLLMProvider(
+        model="claude-haiku-4-5-20251001", api_key="sk-ant-test"
+    )
+
+    await provider.complete(
+        [Message(role=Role.USER, content="How long is leave?")], temperature=0.0
+    )
+
+    assert json.loads(route.calls.last.request.content)["temperature"] == 0.0
+
+
 # ---------------------------------------------------------------------------
 # Embedding providers.
 # ---------------------------------------------------------------------------

@@ -233,12 +233,13 @@ async def test_the_ask_fragment_returns_panels_not_a_page(
     assert "<!doctype" not in body.lower(), "the fragment returned a whole document"
     assert "<html" not in body.lower()
     assert "topbar" not in body, "the fragment must not repeat the page chrome"
-    # It is the canvas, with the Generate card opened: the answer is what that stage
-    # produced, so it lives there rather than in a panel that had nowhere better to
-    # be. A finished run has a payoff to read, which is why the server opens it.
+    # It is the canvas fragment, and it carries the answer. The answer is no longer read out of an expanded Generate card. It is rendered above the pipeline by `_canvas.html`, so what proves a run produced an answer is the answer block itself. That the *fragment*
+    # carries it is the load-bearing part: `axis.js` swaps this into `#canvas`, so an
+    # answer rendered in the page shell instead would exist on a full reload and
+    # vanish on every scripted run.
     assert 'class="canvasboard"' in body
     assert 'data-type="synthesize"' in body
-    assert 'data-expanded="true"' in body
+    assert 'class="answer' in body, "the fragment carries no answer"
 
 
 @pytest.mark.milestone(2)
@@ -257,9 +258,15 @@ async def test_a_fresh_page_starts_empty(client: httpx.AsyncClient) -> None:
     assert 'data-state="done"' not in page, (
         "a fresh session has run nothing — no stage may claim to have completed"
     )
-    # Not blank: the shape of RAG, explained, before anything has been spent.
-    assert "stands for its meaning" in page
-    assert "nothing stored yet" in page
+    # Not blank: the shape of RAG, explained, before anything has been spent. The
+    # answering track is what the Run page draws now — indexing has its own page — so
+    # the sentence checked here is one of its stages'. The index band stays on both.
+    # Both on the indexing page now: "nothing stored yet" is the empty index band, and
+    # the band went with the track it describes.
+    assert "nothing stored yet" in (await client.get("/indexing")).text
+    assert "stands for its meaning" in (await client.get("/indexing")).text, (
+        "the indexing page is blank before a run instead of explaining its stages"
+    )
 
 
 @pytest.mark.milestone(2)

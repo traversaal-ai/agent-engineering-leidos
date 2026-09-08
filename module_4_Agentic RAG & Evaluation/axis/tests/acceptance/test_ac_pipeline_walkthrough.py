@@ -63,6 +63,14 @@ _CHEESE = (
 )
 
 
+# The indexing track moved off the Run page onto its own, because the two phases run
+# on different clocks and drawing the settled one above every question squeezed the
+# answering stages past legibility. Every assertion about parse/chunk/embed/store, and
+# every `?document=` selection, now addresses that page — the behaviour is unchanged,
+# the URL is not.
+INDEXING = "/indexing"
+
+
 async def _indexed(client: httpx.AsyncClient) -> None:
     """Index two known documents, through the form a student uses.
 
@@ -100,10 +108,24 @@ async def _step_id(page: str, step_type: str) -> str:
     return match.group(1)
 
 
+_INDEX_STAGES = frozenset({"parse", "chunk", "embed", "store"})
+
+
 async def _open(client: httpx.AsyncClient, step_type: str) -> str:
-    """That stage's card, expanded — what a student sees after clicking it."""
-    page = (await client.get("/")).text
-    return (await client.get(f"/canvas?stage={await _step_id(page, step_type)}")).text
+    """That stage's card, expanded — what a student sees after clicking it.
+
+    Routed by phase, because the two phases are on different pages now. An index
+    stage has to be opened on `/indexing`: `/canvas` renders the answering track
+    alone — it is what the Run page polls — so asking it for a `parse` card returns
+    a board with nothing expanded, and every content assertion below would fail
+    while the page a student actually sees was working.
+    """
+    base = INDEXING if step_type in _INDEX_STAGES else "/"
+    page = (await client.get(base)).text
+    step_id = await _step_id(page, step_type)
+    if base == INDEXING:
+        return (await client.get(f"{INDEXING}?stage={step_id}")).text
+    return (await client.get(f"/canvas?stage={step_id}")).text
 
 
 async def _after_indexing(client: httpx.AsyncClient) -> str:
@@ -123,7 +145,7 @@ async def test_a_fresh_canvas_claims_nothing(client: httpx.AsyncClient) -> None:
     be asserting work nobody did, in a tool whose whole claim is that what it shows is
     what happened.
     """
-    page = (await client.get("/")).text
+    page = (await client.get(INDEXING)).text
 
     assert 'data-state="pending"' in page
     assert 'data-state="done"' not in page
@@ -143,7 +165,7 @@ async def test_every_indexing_stage_appears_with_its_own_data(
     document become searchable — the only evidence was a chunk count in the sidebar.
     """
     await _indexed(client)
-    page = (await client.get("/")).text
+    page = (await client.get(INDEXING)).text
 
     for stage in ("parse", "chunk", "embed", "store"):
         assert re.search(
@@ -168,11 +190,15 @@ async def test_every_stage_draws_its_data_without_being_clicked(
     await client.post(
         "/ask", data={"question": _QUESTION, "strategy": Strategy.NAIVE_RAG.value}
     )
+    # Both pages, because the two phases are drawn on two of them now. The criterion
+    # is per-stage — "every stage's real data is visible, without a click" — so it is
+    # satisfied per page rather than weakened by the split.
+    indexing = (await client.get(INDEXING)).text
     page = (await client.get("/")).text
 
-    assert 'class="tiles"' in page, "the chunk card does not draw its chunks"
-    assert 'class="strip"' in page, "the embed card does not draw its vector"
-    assert 'class="dots"' in page, "the store card does not draw the index"
+    assert 'class="tiles"' in indexing, "the chunk card does not draw its chunks"
+    assert 'class="strip"' in indexing, "the embed card does not draw its vector"
+    assert 'class="dots"' in indexing, "the store card does not draw the index"
     assert 'class="ranks"' in page, "the search card does not draw its scores"
     assert 'class="bands"' in page, "the augment card does not draw the prompt"
     # And the scores carry the threshold, at card size — the single most explanatory
@@ -180,21 +206,60 @@ async def test_every_stage_draws_its_data_without_being_clicked(
     assert 'class="ranks__line"' in page, "the threshold is not drawn on the card"
 
 
-async def test_the_two_phases_are_drawn_as_one_diagram(
+async def test_the_two_phases_are_each_drawn_with_the_index_between_them(
     client: httpx.AsyncClient,
 ) -> None:
-    """Indexing above, answering below, with the index they share between them.
+    """The notebook's Phase A / Phase B framing, across two pages joined by the index.
 
-    The notebook's own Phase A / Phase B framing. The index band is the object both
-    phases touch and the thing a strip of stages can never show: without it a student
-    has no reason to believe the second track is reading what the first one wrote.
+    **The two tracks used to share the Run page and no longer do.** They run on
+    different clocks: indexing happens once per document and then stays true for the
+    whole session, while answering happens per question. Redrawing the settled phase
+    above every question spent half the board on it and left the six answering stages
+    sharing the other half — at which point their names clipped to "Re…", "Ro…", "De…"
+    and a diagram of a pipeline had stopped naming its own stages.
+
+    So what this asserts is the part that was load-bearing, which was never the
+    adjacency: **each phase is drawn, and the index band is on both pages.** The band is
+    the object both phases touch and the thing a strip of stages can never show —
+    without it a student has no reason to believe the answering track reads what
+    indexing wrote, and that reason has to survive the two being on separate pages.
+    """
+    run = (await client.get("/")).text
+    indexing = (await client.get("/indexing")).text
+
+    assert 'class="track track--query"' in run, "the Run page does not draw answering"
+    assert 'class="track track--index"' not in run, (
+        "indexing is back on the Run page, competing with the answering stages for width"
+    )
+    assert 'class="track track--index"' in indexing, (
+        "the indexing page does not draw the indexing track"
+    )
+
+    # The band belongs to the phase it describes. It reads "written by Store, read by
+    # Search" — a fact about indexing — and on a page drawing only the answering track
+    # it was a wide rule restating what the Search card says, pushing the stages down
+    # the board to say it.
+    assert 'class="indexband"' in indexing
+    assert 'class="indexband"' not in run, (
+        "the index band is back on the Run page, where it describes a track that is "
+        "not drawn"
+    )
+    await _indexed(client)
+    assert "written by Store, read by Search" in (await client.get(INDEXING)).text
+
+
+async def test_the_indexing_page_is_reachable_from_the_nav(
+    client: httpx.AsyncClient,
+) -> None:
+    """A phase on its own page has to be findable, or it has been deleted.
+
+    The failure this guards is specific and quiet: moving the track off the Run page
+    without a link to where it went leaves the four stages rendering correctly at a URL
+    nobody visits, and the product looks like it stopped showing how indexing works.
     """
     page = (await client.get("/")).text
 
-    assert 'class="track track--index"' in page
-    assert 'class="track track--query"' in page
-    assert 'class="indexband"' in page
-    assert "written by Store, read by Search" in (await _after_indexing(client))
+    assert 'href="/indexing"' in page, "nothing links to the indexing page"
 
 
 async def test_the_parse_stage_shows_extracted_text_with_its_location(
@@ -357,8 +422,14 @@ async def test_a_run_in_flight_never_shows_the_previous_answer(
 
     mid_run = (await client.get(f"/canvas?since={floor}")).text
 
-    # Indexing survives: asking a question does not un-index your files.
-    assert re.search(r'data-type="chunk"[^>]*data-state="done"', mid_run)
+    # Indexing survives: asking a question does not un-index your files. Asserted on
+    # its own page, because `/canvas` is the Run page's poller and draws the answering
+    # track alone — which is the point of the split, and does not weaken this: the
+    # claim is that indexing stays done, not that it stays adjacent.
+    assert re.search(
+        r'data-type="chunk"[^>]*data-state="done"',
+        (await client.get(INDEXING)).text,
+    ), "asking a question appears to have un-indexed the documents"
     # The previous answer does not.
     for stage in ("retrieve", "augment", "synthesize"):
         assert re.search(
@@ -383,8 +454,14 @@ async def test_any_earlier_stage_is_reachable_after_a_run(
         "/ask", data={"question": _QUESTION, "strategy": Strategy.NAIVE_RAG.value}
     )
 
-    page = (await client.get("/")).text
-    links = re.findall(r'class="card__open" href="(/\?stage=[^"]+)"', page)
+    # Both pages, and each card links back to the page its own track is drawn on —
+    # an index card that linked to `/?stage=` would open a board with no indexing
+    # track on it, expand nothing, and look broken for a reason nothing explained.
+    indexing = (await client.get(INDEXING)).text
+    run = (await client.get("/")).text
+    links = re.findall(
+        r'class="card__open" href="(/indexing\?stage=[^"]+)"', indexing
+    ) + re.findall(r'class="card__open" href="(/\?stage=[^"]+)"', run)
     assert len(links) >= 6, f"only {len(links)} stages are reachable"
 
     for href in links:
@@ -423,7 +500,7 @@ def _document_links(page: str) -> dict[str, str]:
     return {
         name.strip(): document_id
         for document_id, name in re.findall(
-            r'href="/\?document=([^"]+)"[^>]*>.*?</span>\s*([^<]+)', page, re.S
+            r'href="/indexing\?document=([^"]+)"[^>]*>.*?</span>\s*([^<]+)', page, re.S
         )
     }
 
@@ -434,14 +511,14 @@ async def test_any_indexed_document_can_be_chosen_from_the_sidebar(
     """The ask: reach an earlier document's indexing details, not just the last one."""
     await _indexed(client)
 
-    page = (await client.get("/")).text
+    page = (await client.get(INDEXING)).text
     links = _document_links(page)
     assert set(links) == {"cheese.pdf", "handbook.pdf"}, links
     assert _track_subject(page).startswith("handbook.pdf"), (
         "the default should still be the document just indexed"
     )
 
-    chosen = (await client.get(f"/?document={links['cheese.pdf']}")).text
+    chosen = (await client.get(f"{INDEXING}?document={links['cheese.pdf']}")).text
 
     assert _track_subject(chosen).startswith("cheese.pdf")
     assert "alpine cheese" in chosen.lower(), (
@@ -463,10 +540,10 @@ async def test_the_indexing_track_never_mixes_two_documents(
     last. So all four cards must come from one `ingest` run.
     """
     await _indexed(client)
-    page = (await client.get("/")).text
+    page = (await client.get(INDEXING)).text
     cheese = _document_links(page)["cheese.pdf"]
 
-    chosen = (await client.get(f"/?document={cheese}")).text
+    chosen = (await client.get(f"{INDEXING}?document={cheese}")).text
     steps = (await client.get("/trace/recent")).json()["steps"]
 
     # Every indexing card on the page, resolved back to the trace it came from.
@@ -493,12 +570,12 @@ async def test_the_index_band_reports_the_whole_index_whichever_document_is_chos
     """
     await _indexed(client)
 
-    default = (await client.get("/")).text
+    default = (await client.get(INDEXING)).text
     everything = _band_vectors(default)
     assert everything >= 2, f"expected both documents in the index, got {everything}"
 
     first = (
-        await client.get(f"/?document={_document_links(default)['cheese.pdf']}")
+        await client.get(f"{INDEXING}?document={_document_links(default)['cheese.pdf']}")
     ).text
 
     assert _band_vectors(first) == everything, (
@@ -525,10 +602,10 @@ async def test_choosing_a_document_survives_opening_a_card(
     also what keeps the scripts-disabled path correct.
     """
     await _indexed(client)
-    page = (await client.get("/")).text
+    page = (await client.get(INDEXING)).text
     cheese = _document_links(page)["cheese.pdf"]
 
-    chosen = (await client.get(f"/?document={cheese}")).text
+    chosen = (await client.get(f"{INDEXING}?document={cheese}")).text
     links = re.findall(r'class="card__open" href="([^"]+)"', chosen)
     assert links, "no cards to open"
     assert all(f"document={cheese}" in href for href in links), (
@@ -547,35 +624,36 @@ async def test_choosing_a_document_survives_opening_a_card(
     )
 
 
-async def test_asking_a_question_keeps_the_chosen_document(
+async def test_asking_a_question_leaves_the_indexing_selection_alone(
     client: httpx.AsyncClient,
 ) -> None:
-    """The no-JavaScript path re-renders the whole page, so the selection is submitted.
+    """The selection belongs to the indexing page, and a question does not disturb it.
 
-    With a script the canvas is re-fetched with the parameter still in the address bar.
-    Without one, a hidden field on the ask form is the only thing that carries it.
+    **This replaces a test of the opposite coupling**, and the change is the point.
+    The ask form used to carry a hidden `document` field, because the indexing track
+    was drawn on the Run page and submitting the form re-rendered it — without the
+    field, asking a question silently moved the track back to the last document
+    uploaded. The track is on its own page now, so the Run page has nothing to move
+    and the hidden field has nothing to protect.
+
+    What still has to hold is that the selection *survives* being left and returned
+    to, which is what a student does: pick a document, go ask about it, come back.
     """
     await _indexed(client)
-    page = (await client.get("/")).text
-    cheese = _document_links(page)["cheese.pdf"]
+    cheese = _document_links((await client.get(INDEXING)).text)["cheese.pdf"]
 
-    chosen = (await client.get(f"/?document={cheese}")).text
-    assert f'name="document" value="{cheese}"' in chosen, (
-        "the ask form does not carry the indexing selection"
+    chosen = (await client.get(f"{INDEXING}?document={cheese}")).text
+    assert _track_subject(chosen).startswith("cheese.pdf"), (
+        "the indexing page does not honour its own selection"
     )
 
-    answered = (
-        await client.post(
-            "/ask",
-            data={
-                "question": _QUESTION,
-                "strategy": Strategy.NAIVE_RAG.value,
-                "document": cheese,
-            },
-        )
-    ).text
+    await client.post(
+        "/ask", data={"question": _QUESTION, "strategy": Strategy.NAIVE_RAG.value}
+    )
 
-    assert _track_subject(answered).startswith("cheese.pdf"), (
+    # Back to the page, with the same parameter a student's back button would carry.
+    returned = (await client.get(f"{INDEXING}?document={cheese}")).text
+    assert _track_subject(returned).startswith("cheese.pdf"), (
         "asking a question moved the indexing track to a different document"
     )
 
@@ -586,7 +664,7 @@ async def test_an_unknown_document_falls_back_to_the_newest(
     """A stale link or a bookmark taken before a reset. The newest is what they want."""
     await _indexed(client)
 
-    response = await client.get("/?document=nosuchdocument")
+    response = await client.get(f"{INDEXING}?document=nosuchdocument")
 
     assert response.status_code == 200
     assert _track_subject(response.text).startswith("handbook.pdf")
@@ -609,13 +687,13 @@ async def test_a_document_that_failed_shows_where_it_stopped(
         follow_redirects=True,
     )
 
-    page = (await client.get("/")).text
+    page = (await client.get(INDEXING)).text
     # A failed document has an ingest run, so it is selectable — that run is exactly
     # the record of the failure.
     broken = _document_links(page).get("broken.pdf")
     assert broken, f"a failed document cannot be inspected: {_document_links(page)}"
 
-    chosen = (await client.get(f"/?document={broken}")).text
+    chosen = (await client.get(f"{INDEXING}?document={broken}")).text
     states = dict(
         re.findall(r'data-type="(parse|chunk|embed|store)"[^>]*data-state="([a-z]+)"', chosen)
     )
@@ -638,7 +716,8 @@ async def test_the_whole_walkthrough_works_without_javascript(
     so this is exactly the path a scripts-disabled browser takes.
     """
     await _indexed(client)
-    page = (await client.get("/")).text
+    # On the indexing page, which is where a finished upload now shows its result.
+    page = (await client.get(INDEXING)).text
     assert 'data-state="done"' in page, "indexing left no visible result"
 
     answered = await client.post(
@@ -646,11 +725,10 @@ async def test_the_whole_walkthrough_works_without_javascript(
     )
     assert answered.status_code == 200, answered.text
 
-    # The run finished with the Generate card open, because the answer is what that
-    # stage produced and a finished run has a payoff to read.
+    # The run finished with an answer on screen. The answer is no longer read out of an expanded Generate card. It is rendered above the pipeline by `_canvas.html`, so what proves a run produced an answer is the answer block itself.
     assert "Generate" in answered.text
     assert 'data-type="synthesize"' in answered.text
-    assert 'data-expanded="true"' in answered.text
+    assert 'class="answer' in answered.text, "the run produced no answer block"
 
     href = re.search(r'class="card__open" href="(/\?stage=[^"]+)"', answered.text)
     assert href, "no stage is reachable as a plain link"
@@ -669,12 +747,12 @@ async def test_starting_over_empties_the_canvas(client: httpx.AsyncClient) -> No
     room.
     """
     await _indexed(client)
-    assert 'data-state="done"' in (await client.get("/")).text
+    assert 'data-state="done"' in (await client.get(INDEXING)).text
 
     reset = await client.post("/reset", follow_redirects=False)
     assert reset.status_code == 303, reset.text
 
-    page = (await client.get("/")).text
+    page = (await client.get(INDEXING)).text
     assert 'data-state="done"' not in page, "a stage survived the reset"
     assert "Nothing indexed yet" in page
 
@@ -698,14 +776,18 @@ async def test_a_stage_is_drawn_as_running_while_it_runs(
     live path is the same renderer reading the same trace, once per poll.
     """
     await _indexed(client)
-    page = (await client.get("/")).text
+    page = (await client.get(INDEXING)).text
     chunk = await _step_id(page, "chunk")
 
     # Put that stage back into the state a poll two seconds into a run would find.
     step = await step_store.get_step(chunk)
     await step_store.append(step.model_copy(update={"status": StepStatus.RUNNING}))
 
-    running = (await client.get("/canvas")).text
+    # Rendered from the indexing page: `/canvas` is the Run page's poller and draws
+    # the answering track alone, so a chunk card is not on it. What is being tested is
+    # that "running" is read off the trace rather than guessed at, which is true of
+    # whichever page draws the stage.
+    running = (await client.get(INDEXING)).text
     assert re.search(r'data-type="chunk"[^>]*data-state="running"', running), (
         "a stage the trace says is running is not drawn as running"
     )
@@ -727,7 +809,7 @@ async def test_the_trace_fingerprint_changes_when_a_status_changes(
     before = (await client.get("/trace/recent")).json()
     assert before["fingerprint"], "a session with steps must have a fingerprint"
 
-    page = (await client.get("/")).text
+    page = (await client.get(INDEXING)).text
     step = await step_store.get_step(await _step_id(page, "chunk"))
     await step_store.append(step.model_copy(update={"status": StepStatus.RUNNING}))
 
@@ -773,6 +855,14 @@ async def test_opening_a_card_keeps_the_rest_of_the_diagram_drawn(
     opened = (await client.get(f"/canvas?stage={await _step_id(page, 'retrieve')}")).text
 
     assert 'data-expanded="true"' in opened
-    # The indexing track is in the other half of the board and keeps every miniature.
-    for art in ("art--parse", "art--chunk", "art--embed", "art--store"):
+    # **Its own track's other stages keep their miniatures**, which is the assertion
+    # that now carries this criterion. It used to name the indexing arts, on the
+    # reasoning that the other track must survive an open card; indexing has its own
+    # page and cannot be disturbed by this at all, so the real risk moved next door.
+    # Opening a card used to give it `flex: 3` and leave its neighbours at `flex: 1` —
+    # about 80px, enough for a clipped name and no data — so the flow it cost was the
+    # one in the same track. Stacked rows are what fixed that, and this is the guard.
+    # Not `art--search`: that is the opened card, which draws its full pane instead of
+    # a miniature. These are the neighbours it used to squeeze.
+    for art in ("art--augment", "art--generate"):
         assert art in opened, f"{art} left the screen when a card was opened"

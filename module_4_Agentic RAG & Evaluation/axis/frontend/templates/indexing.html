@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Indexing &middot; Axis{% endblock %}
+
+{# The four stages that turn a file into something searchable, on their own page.
+
+   It used to sit above the answering track on the Run page. Two things were wrong with
+   that. It runs on a different clock — once per document, then true for the rest of the
+   session — so it was redrawn above every question having not changed since the upload.
+   And it cost half the board permanently, which left the six answering stages sharing
+   the other half: at that width their names clipped to "Re…", "Ro…", "De…" and a
+   diagram of a pipeline stopped naming its own stages.
+
+   What stayed behind on the Run page is the index band. It is the object both phases
+   touch, and "written by Store, read by Search" is what makes the answering track's
+   Search stage mean something with this page closed.
+
+   Expects the canvas context with `phases=('index',)` and `card_base='/indexing'`. #}
+
+{% block content %}
+<div class="page">
+  <header class="page__head">
+    <h1 class="page__title">Indexing</h1>
+    <p class="page__lede">
+      Once per document, and then true for the rest of the session. Parse extracts the
+      text, Chunk cuts it into overlapping windows, Embed turns each one into the numbers
+      a model actually compares, and Store writes them where Search will read them.
+      {% if documents | length > 1 %}
+      The four stages describe <strong>one</strong> document &mdash; pick which in the
+      sidebar on the Run page.
+      {% endif %}
+    </p>
+  </header>
+
+  {# **Drawn even with nothing indexed**, which is deliberate and was briefly broken
+     here by an empty state that replaced it. A fresh board is not blank: each card
+     says what its stage is *for*, so the page is the shape of indexing explained
+     before a penny has been spent, and no card claims to have run.
+     `test_a_fresh_canvas_claims_nothing` is the guard. #}
+  {% if not documents %}
+  <p class="page__note">
+    Nothing is indexed yet &mdash; upload a document, or load the demo set, on the
+    <a href="/">Run</a> page. The four stages below say what each one will do.
+  </p>
+  {% endif %}
+  <div class="canvaswrap canvaswrap--single">
+    {% include "_canvas.html" %}
+  </div>
+</div>
+{% endblock %}

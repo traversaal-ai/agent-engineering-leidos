@@ -94,7 +94,12 @@
   </div>
 
   <div class="card">
-    <div class="answer__text">{{ summary.summary | e }}</div>
+    {# `| md`, the same filter the answer body uses, and for the same reason: this is
+       model prose, and it is the longest piece of it the product shows. It was left on
+       `| e` when the answer moved over, so a summary came out with literal "**" around
+       every heading the model wrote. `_inline_markdown` escapes first and decorates
+       after, so this is not a weaker guarantee than `| e` — see the filter. #}
+    <div class="answer__text">{{ summary.summary | md }}</div>
     {% if summary.citations %}
     <ol class="citations">
       {% for citation in summary.citations %}

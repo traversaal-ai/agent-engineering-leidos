@@ -37,6 +37,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup, escape
 
 from ai_backend.config.settings import FrontendSettings, Settings, for_frontend, get_settings
 from ai_backend.contracts.models import Strategy
@@ -84,6 +85,51 @@ def _vendored(files: tuple[str, ...]) -> bool:
 # change and never otherwise. A restart with no edit keeps the cache warm, and an edit
 # invalidates exactly the file that changed.
 _ASSET_HASHES: dict[str, str] = {}
+
+
+# Inline markdown, and only inline. Models write "**Net 45**" whether or not you ask
+# them to, and rendering that as literal asterisks made every answer look like it had
+# been pasted out of a terminal.
+#
+# **Escaped first, then decorated.** The answer is LLM output derived from uploaded
+# documents — untrusted input, System Design Section 6.5 priority 4 — so the text is
+# HTML-escaped *before* any of these patterns run. The patterns then only ever insert
+# tags around already-inert text, which means no markup the model emits can survive as
+# markup. Reaching for a markdown library instead would have meant auditing its HTML
+# passthrough, and every library has one.
+#
+# Block syntax is deliberately absent: no headings, no lists, no links. `pre-wrap` in
+# the stylesheet already preserves the line structure, so a model's "- item" reads as a
+# bullet without anything parsing it, and a link is the one construct that could carry
+# a destination a reader might click.
+_MD_CODE = re.compile(r"`([^`\n]+)`")
+_MD_BOLD = re.compile(r"\*\*(\S(?:[^*]*\S)?)\*\*")
+# `*` only. `_italic_` is not supported on purpose: contract text and filenames carry
+# underscores in the middle of words, and a rule that turns `acme_msa_2026` into
+# emphasis is worse than no emphasis at all.
+_MD_ITALIC = re.compile(r"(?<![\w*])\*(\S(?:[^*]*\S)?)\*(?![\w*])")
+_MD_STASH = re.compile(r"\x00(\d+)\x00")
+
+
+def _inline_markdown(text: str | None) -> Markup:
+    """Bold, italic and inline code, over text that has already been made inert."""
+    out = str(escape(text or ""))
+
+    # Code spans are lifted out before the emphasis rules run, so `**` inside a code
+    # span stays literal — which is the whole point of a code span.
+    spans: list[str] = []
+
+    def stash(match: re.Match[str]) -> str:
+        spans.append(match.group(1))
+        return f"\x00{len(spans) - 1}\x00"
+
+    out = _MD_CODE.sub(stash, out)
+    # Bold before italic: `**x**` would otherwise be read as an italic `*` wrapping
+    # `*x*`, and the answer would come out with stray asterisks inside emphasis.
+    out = _MD_BOLD.sub(r"<strong>\1</strong>", out)
+    out = _MD_ITALIC.sub(r"<em>\1</em>", out)
+    out = _MD_STASH.sub(lambda m: f"<code>{spans[int(m.group(1))]}</code>", out)
+    return Markup(out)
 
 
 def _asset_url(name: str) -> str:
@@ -152,6 +198,9 @@ def create_app(
     # makes "reload and the fix is there" reliable, which in a tool driven live in front
     # of a class is not a nicety.
     templates.env.globals["asset"] = _asset_url
+    # `| md` in place of `| e` wherever model prose is shown. It escapes internally,
+    # so it is not an opt-out of autoescaping — see `_inline_markdown`.
+    templates.env.filters["md"] = _inline_markdown
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -211,8 +260,18 @@ def create_app(
                 "web_search": _web_search(request),
                 "cache_on": _cache_enabled(request),
                 "flash": request.query_params.get("flash"),
+                # **Answering only.** Indexing runs once per document and then stays
+                # true for the whole session, so redrawing it above every question cost
+                # half the board permanently and squeezed the six answering stages into
+                # unreadable slivers. It has its own page now; the index band stays
+                # here, because "read by Search" is the one thing the Run page still
+                # needs from that phase.
                 **await _canvas_context(
-                    request, stage_id=stage, document_id=document, documents=documents
+                    request,
+                    stage_id=stage,
+                    document_id=document,
+                    documents=documents,
+                    phases=("query",),
                 ),
             },
         )
@@ -299,6 +358,47 @@ def create_app(
                 "nav": "compare",
                 "comparison": _comparison(
                     request.cookies.get(_SESSION_COOKIE), available, chosen
+                ),
+            },
+        )
+
+    @app.get("/indexing", response_class=HTMLResponse)
+    async def indexing_page(
+        request: Request, stage: str | None = None, document: str | None = None
+    ) -> HTMLResponse:
+        """The four stages that turn a file into something searchable.
+
+        **Its own page, because it runs on a different clock.** Indexing happens once
+        per document and then stays true for the rest of the session; answering happens
+        per question. Drawing both above every question spent half the board on a phase
+        that had not changed since the upload, and left the six answering stages sharing
+        the other half — at which point their names clipped to "Re…", "Ro…", "De…" and
+        the diagram stopped naming its own stages.
+
+        The index band stays on the Run page as well. It is the object both phases
+        touch, and "written by Store, read by Search" is the sentence that makes the
+        answering track's Search stage mean something without this page open beside it.
+
+        `?document=` picks which document the four stages describe, the same way it did
+        when this track lived on the Run page; `?stage=` opens one card, and index cards
+        now link back here rather than to `/`.
+        """
+        client: BackendClient = request.app.state.backend
+        documents = await _documents(client, request, corpus=_corpus(request))
+        return templates.TemplateResponse(
+            request=request,
+            name="indexing.html",
+            context={
+                **await _chrome(request),
+                "nav": "indexing",
+                "documents": documents,
+                **await _canvas_context(
+                    request,
+                    stage_id=stage,
+                    document_id=document,
+                    documents=documents,
+                    phases=("index",),
+                    card_base="/indexing",
                 ),
             },
         )
@@ -1060,15 +1160,20 @@ def create_app(
             # default — the canvas's shape depends on it, and an agentic run rendered
             # against the naive tracks would be missing two of its own cards.
             #
-            # `expand="synthesize"` opens the answer, and it is the one place the server
-            # chooses what is open. A run that has just finished has a payoff to read,
-            # and the Generate card's miniature is a first line rather than an answer.
+            # **No `expand="synthesize"` any more.** The server used to open the
+            # Generate card after a run, because the answer was only readable inside
+            # it. The answer is now rendered above the pipeline by `index.html`, so
+            # expanding that card would show the same text twice — and on a
+            # single-track board the expanded row is tall enough to push every other
+            # stage out of the track's scroll, which is how the answer came to look
+            # clipped and missing.
             **await _canvas_context(
                 request,
                 strategy=strategy,
-                expand="synthesize",
                 document_id=document_id,
                 documents=documents,
+                # index.html, so the same single track the Run page draws.
+                phases=("query",),
             ),
         }
         return context, cookies
@@ -1459,8 +1564,16 @@ def create_app(
         since: int = 0,
         document_id: str | None = None,
         documents: list[dict] | None = None,
+        phases: tuple[str, ...] = ("index", "query"),
+        card_base: str = "/",
+        answer_pending: bool = False,
     ) -> dict:
         """The canvas's state: which stages have run, and with which step.
+
+        `phases` chooses which tracks the board draws, and `card_base` is the path a
+        card's open/close link points back at. The two travel together: Indexing moved
+        to its own page, so an index card has to reopen on `/indexing` rather than on
+        the Run page, where its track is no longer drawn.
 
         Reads the session's whole trace rather than one run, because the two phases
         have different lifetimes — indexing happened when a document was uploaded and
@@ -1611,6 +1724,9 @@ def create_app(
 
         return {
             "stages": stages,
+            # Which tracks to draw, and where a card's links point. See the docstring.
+            "phases": phases,
+            "card_base": card_base,
             "stage_steps": bound,
             "stage": opened,
             # The band at the head of the answering track, and whether it greys the
@@ -1639,11 +1755,21 @@ def create_app(
             "index_total": index_total,
             "STAGE_TITLES": STAGE_TITLES,
             "STAGE_WHY": STAGE_WHY,
-            # The answer belongs to the generate stage, which is where a student looks
-            # for it. Attached only there, and only for the run that produced it.
-            "answer": _last_answer(session_id)
-            if opened and opened.get("step_type") in ("synthesize", "generate")
-            else None,
+            # **The session's last answer, unconditionally.** It used to be attached
+            # only when the synthesize card was open, because that card was the only
+            # place it was rendered. The answer leads the page now — it is what the
+            # student asked for — so gating it on a card being expanded left the
+            # headline empty the moment the server stopped auto-expanding that card.
+            # `None` on a fresh session, which is what suppresses the block.
+            #
+            # **Suppressed while a run is in flight**, and that is not cosmetic: the
+            # poller replaces the whole fragment every few hundred milliseconds, so an
+            # unconditional answer here rendered the *previous* question's answer back
+            # over the new run, several times a second. The board showed a settled
+            # answer above a freshly-running set of stages — and it beat the client's
+            # own attempt to clear it, because the next poll simply put it back.
+            "answer": None if answer_pending else _last_answer(session_id),
+            "answer_pending": answer_pending,
         }
 
     @app.get("/canvas", response_class=HTMLResponse)
@@ -1666,7 +1792,17 @@ def create_app(
             request=request,
             name="_canvas.html",
             context=await _canvas_context(
-                request, stage_id=stage, since=since, document_id=document
+                request,
+                stage_id=stage,
+                since=since,
+                document_id=document,
+                # Only the Run page polls, and it draws one track. The indexing page
+                # changes on an upload, which is a form post that re-renders anyway.
+                phases=("query",),
+                # `since` is set only by the poller, and the poller only runs while a
+                # question is being answered — so this is the one signal available for
+                # "a run is in flight" without inventing a second parameter for it.
+                answer_pending=since > 0,
             ),
         )
 

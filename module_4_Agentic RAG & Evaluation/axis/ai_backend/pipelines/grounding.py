@@ -286,61 +286,114 @@ async def augment(
     return messages
 
 
-def extract_citations(text: str, passages: list[Passage]) -> list[Citation]:
-    """Resolve `[n]` markers back to the passages they point at.
+# Where a marker was dropped, so the space it left behind can be closed without
+# touching whitespace anywhere else in the answer. Never reaches the reader: the
+# substitution below removes every occurrence, including any the model wrote itself.
+_DROPPED_MARKER = "\x00"
+_DROPPED_MARKER_GAP = re.compile(r"[ \t]*\x00")
 
-    **A marker outside the retrieved range is dropped, not trusted.** A model that
-    emits [9] against five passages has hallucinated a source, and rendering that
-    as a citation would be worse than omitting it — a student following it would
-    find nothing, and the platform would have taught them to trust a citation that
-    was invented.
 
-    Order follows first appearance in the answer, so the citation list reads in
-    the order the reader meets the claims.
+def resolve_citations(text: str, passages: list[Passage]) -> tuple[str, list[Citation]]:
+    """Resolve `[n]` markers, and renumber the answer so it agrees with its own list.
+
+    **Both halves, returned together, because returning only the list was a bug.**
+    `extract_citations` builds the list in order of first appearance and drops
+    duplicates and out-of-range markers — so a model that writes "[1] ... [4]"
+    against five passages produces a two-entry list, and the renderer numbers that
+    list `[1] [2]` from its own loop index. The prose still said `[4]`. A student
+    following `[4]` found no `[4]`, while the entry they wanted sat there labelled
+    `[2]`. The content was right and the numbering was a lie, which is the worst
+    shape a citation bug can take in a tool whose whole claim is that its citations
+    can be followed.
+
+    So the markers are rewritten as the list is built. Both come out of one walk over
+    the text and cannot disagree.
+
+    Two markers pointing at the same passage — via a duplicate in `passages` — collapse
+    onto the same new number rather than producing two entries for one source.
+
+    **A marker outside the retrieved range is removed from the prose, not merely left
+    out of the list.** A model that emits [9] against five passages has hallucinated a
+    source; leaving `[9]` in the text is the same dangling-marker bug from the other
+    direction, so the marker goes with the citation it never had.
+
+    **The tidying that follows a removal is local to the removal.** Dropping a marker
+    leaves " ." or a doubled space where it stood, and the first version swept those up
+    with two whole-text substitutions — one of which collapsed *every* run of spaces in
+    the answer. `.answer__text` is `pre-wrap`, so that silently reflowed a model's
+    indented sub-list or aligned figures in an answer that had no bad marker in it at
+    all. The dropped marker leaves a sentinel instead, and only the sentinel and the
+    space before it are removed.
     """
     citations: list[Citation] = []
-    seen: set[str] = set()
+    # passage key -> the number it is shown as, 1-based over the citations kept.
+    numbering: dict[str, int] = {}
 
-    for match in _CITATION_MARKER.finditer(text):
+    def renumber(match: re.Match[str]) -> str:
         index = int(match.group(1))
         if not 1 <= index <= len(passages):
-            continue
+            return _DROPPED_MARKER
         passage = passages[index - 1]
-        if passage.key in seen:
-            continue
-        seen.add(passage.key)
+        existing = numbering.get(passage.key)
+        if existing is not None:
+            return f"[{existing}]"
+        citation = _citation_for(passage)
+        if citation is None:
+            # A passage carrying neither a chunk nor a web source cannot be cited,
+            # so its marker cannot stand either.
+            return _DROPPED_MARKER
+        citations.append(citation)
+        numbering[passage.key] = len(citations)
+        return f"[{len(citations)}]"
 
-        if passage.chunk is not None:
-            citations.append(
-                Citation(
-                    document_id=passage.chunk.document_id,
-                    # Left blank deliberately. Filenames live in the Backend's
-                    # `document` table (System Design Section 7) — the AI Backend
-                    # indexes by `document_id` and has no business holding a second
-                    # copy that could drift. `backend/api/v1/query.py` resolves it.
-                    filename="",
-                    source_location=passage.chunk.source_location,
-                    quote=passage.chunk.content[:280],
-                    kind=SourceKind.DOCUMENT,
-                )
-            )
-        elif passage.source is not None:
-            citations.append(
-                Citation(
-                    # No `document_id`: there is no document. Left empty rather than
-                    # filled with the URL, because `document_id` is a foreign key
-                    # into the Backend's document table and the evaluation harness
-                    # scores document recall on it — putting a URL there would make
-                    # a web result look like an uploaded file to both.
-                    document_id="",
-                    filename=passage.source.title or passage.source.url,
-                    source_location=passage.source.url,
-                    quote=passage.source.snippet[:280],
-                    kind=SourceKind.WEB,
-                    url=passage.source.url,
-                )
-            )
-    return citations
+    rewritten = _CITATION_MARKER.sub(renumber, text)
+    # Each removed marker, and the space that used to separate it from the word before
+    # it, go together — so "claim [9]." reads "claim." and nothing else in the answer
+    # is touched. A sentinel the model somehow emitted itself is swept up by the same
+    # pass, which is the only reason it is safe to use one.
+    rewritten = _DROPPED_MARKER_GAP.sub("", rewritten)
+    return rewritten, citations
+
+
+def extract_citations(text: str, passages: list[Passage]) -> list[Citation]:
+    """The citation list alone, for callers that do not render the text.
+
+    Delegates to `resolve_citations` so there is one implementation of which markers
+    are trustworthy. Prefer `resolve_citations` anywhere the text is also shown —
+    the numbering only agrees if both come from the same walk.
+    """
+    return resolve_citations(text, passages)[1]
+
+
+def _citation_for(passage: Passage) -> Citation | None:
+    """One passage as a citation, or `None` if it cannot be cited at all."""
+    if passage.chunk is not None:
+        return Citation(
+            document_id=passage.chunk.document_id,
+            # Left blank deliberately. Filenames live in the Backend's `document`
+            # table (System Design Section 7) — the AI Backend indexes by
+            # `document_id` and has no business holding a second copy that could
+            # drift. `backend/api/v1/query.py` resolves it.
+            filename="",
+            source_location=passage.chunk.source_location,
+            quote=passage.chunk.content[:280],
+            kind=SourceKind.DOCUMENT,
+        )
+    if passage.source is not None:
+        return Citation(
+            # No `document_id`: there is no document. Left empty rather than filled
+            # with the URL, because `document_id` is a foreign key into the Backend's
+            # document table and the evaluation harness scores document recall on it —
+            # putting a URL there would make a web result look like an uploaded file
+            # to both.
+            document_id="",
+            filename=passage.source.title or passage.source.url,
+            source_location=passage.source.url,
+            quote=passage.source.snippet[:280],
+            kind=SourceKind.WEB,
+            url=passage.source.url,
+        )
+    return None
 
 
 def dedupe_chunks(chunks: list[Chunk]) -> list[Chunk]:

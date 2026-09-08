@@ -306,11 +306,10 @@ async def test_a_labelled_question_runs_with_no_javascript(
     assert answered.status_code == 200, answered.text
     # The question that ran is the one the button carried, not the empty textarea.
     assert chosen.question[:40] in answered.text
-    # And it ran against the indexed corpus: the Generate card is open with the
-    # answer in it, which the empty textarea path would not have produced.
+    # And it ran against the indexed corpus: there is an answer block, which the
+    # empty textarea path would not have produced. The answer is no longer read out of an expanded Generate card. It is rendered above the pipeline by `_canvas.html`, so what proves a run produced an answer is the answer block itself.
     assert 'data-type="synthesize"' in answered.text
-    assert 'data-expanded="true"' in answered.text
-    assert "Answer" in answered.text, "the preset question produced no answer"
+    assert 'class="answer' in answered.text, "the preset question produced no answer"
 
 
 async def test_an_empty_ask_does_not_500(client: httpx.AsyncClient) -> None:

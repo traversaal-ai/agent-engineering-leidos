@@ -80,12 +80,12 @@
 
     <div class="versus__answer">
       {% if run.answer.grounded %}
-      <p>{{ run.answer.answer }}</p>
+      <p>{{ run.answer.answer | md }}</p>
       {% else %}
       {# Withheld, not empty. Both strategies refuse rather than fabricate, and a
          refusal is a result worth reading — on the unanswerable questions it is the
          *correct* one. #}
-      <p class="versus__withheld">{{ run.answer.answer }}</p>
+      <p class="versus__withheld">{{ run.answer.answer | md }}</p>
       {% endif %}
     </div>
 

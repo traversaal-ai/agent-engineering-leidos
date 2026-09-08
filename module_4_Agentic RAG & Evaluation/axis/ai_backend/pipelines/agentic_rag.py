@@ -51,7 +51,7 @@ from ai_backend.pipelines.grounding import (
     NO_CONTENT_SENTINEL,
     augment,
     dedupe_chunks,
-    extract_citations,
+    resolve_citations,
     passages_from,
     ungrounded_answer,
 )
@@ -374,7 +374,12 @@ class AgenticRagPipeline:
                     usage=total,
                 )
 
-            citations = extract_citations(completion.text, passages)
+            # Text and citations from one walk, so the markers in the prose and
+            # the numbers on the list cannot disagree. They did: the list is built
+            # in order of first appearance and rendered from its own loop index, so
+            # a model writing "[1] ... [4]" produced prose citing [4] beside a list
+            # whose second entry was labelled [2].
+            answer_text, citations = resolve_citations(completion.text, passages)
             step.set_attribute("citations", len(citations))
             step.set_output(completion.text)
 
@@ -394,7 +399,7 @@ class AgenticRagPipeline:
                 )
 
             return self._answer(
-                ctx, completion.text, citations, grounded=True, usage=total
+                ctx, answer_text, citations, grounded=True, usage=total
             )
 
     # -- the ungrounded path ----------------------------------------------

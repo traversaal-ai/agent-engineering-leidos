@@ -43,6 +43,12 @@ MAX_REWRITE_TOKENS = 200
 MAX_HISTORY_TURNS = 3
 MAX_HISTORY_ANSWER_CHARS = 200
 
+# Below this many content words, a question is too referential to overlap-check
+# against its own resolution — see `_is_plausible`. Two, because one surviving
+# stopword-stripped word ("long" in "How long is it?") is not what the question was
+# about, so a correct resolution has no reason to carry it.
+MIN_CONTENT_WORDS_FOR_OVERLAP = 2
+
 # A rewrite is a search query, not prose. A model that returns a paragraph has
 # misunderstood the task, and the excess is dropped rather than embedded.
 MAX_REWRITE_CHARS = 300
@@ -237,15 +243,29 @@ def _is_plausible(rewritten: str, original: str) -> bool:
     A model that returns an answer, a refusal, or a paragraph of prose shares
     nothing, and the caller falls back to the question as typed.
 
-    **Skipped when the question has no content words of its own.** "How long is
-    it?" tokenizes to `['long']`, and something like "What about that one?" can
-    reduce to almost nothing — for a question made entirely of stopwords there is
-    nothing to compare against, and requiring an overlap would reject every valid
-    resolution of exactly the follow-ups this stage exists for. Recorded because it
-    inverts the guard for the case that matters most.
+    **Skipped when the question has almost no content words of its own.** This is
+    the case the guard has to yield to, and getting it wrong breaks the one pain
+    point the rewriter exists for. "How long is it?" tokenizes to `['long']` — a
+    single word that a correct resolution ("What is the term of the Master Services
+    Agreement?") has no reason to keep, because `long` was never what the question
+    was *about*; it was the only word that survived stopword removal. Requiring an
+    overlap there rejects every valid resolution of exactly the follow-ups this
+    stage exists for.
+
+    So the threshold is `MIN_CONTENT_WORDS_FOR_OVERLAP`, not emptiness. An earlier
+    version skipped only when `tokenize(original)` was empty, which never fired for
+    "How long is it?" and silently discarded the correct rewrite — the demonstration
+    reported "discarded: … shares no content word with the question" while the model
+    had done its job perfectly. A referential follow-up shares nothing with its own
+    resolution by construction; that is what makes it referential.
+
+    Above the threshold the guard still does its real work: catching a model that
+    answered, refused, or returned prose instead of rewriting, which would otherwise
+    replace the student's question with something they never asked and leave the
+    router, the decomposer and retrieval all working on the wrong text.
     """
     wanted = set(tokenize(original))
-    if not wanted:
+    if len(wanted) < MIN_CONTENT_WORDS_FOR_OVERLAP:
         return True
     return bool(wanted & set(tokenize(rewritten)))
 

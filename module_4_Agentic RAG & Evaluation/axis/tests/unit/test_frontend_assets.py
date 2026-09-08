@@ -528,25 +528,33 @@ async def test_the_workspace_fits_the_viewport(client: httpx.AsyncClient) -> Non
 
 
 async def test_the_canvas_shows_both_phases_of_rag(client: httpx.AsyncClient) -> None:
-    """Indexing and answering, as two tracks of one diagram, in the order they run.
+    """Indexing and answering, each as a track, joined by the index band on both pages.
 
     The Naive RAG notebook frames the subject exactly this way — "Phase A — Indexing,
     done once, upfront" then "Phase B — Query" — and a student arriving from it should
-    recognise the shape. Separate screens would hide the fact that makes retrieval
-    work: the same model and the same vector space on both sides.
+    recognise the shape.
 
-    The index band between the tracks is what carries that across. It is the object
-    both phases touch, and without it nothing on screen says the second track reads
-    what the first one wrote.
+    **The two tracks are on two pages now, and the band is what carries the join.**
+    They ran on one screen until it became clear they run on different clocks:
+    indexing happens once per document and then stays true, answering happens per
+    question, so redrawing the settled phase above every question spent half the board
+    on it and squeezed the six answering stages until their names clipped. The band is
+    on both pages precisely because it is the object both phases touch — it is what
+    says the second track reads what the first one wrote, and that had to survive.
     """
-    page = (await client.get("/")).text
+    run = (await client.get("/")).text
+    indexing = (await client.get("/indexing")).text
 
-    for stage in ("parse", "chunk", "embed", "store", "retrieve", "augment", "synthesize"):
-        assert f'data-type="{stage}"' in page, f"{stage!r} missing from the canvas"
+    for stage in ("parse", "chunk", "embed", "store"):
+        assert f'data-type="{stage}"' in indexing, f"{stage!r} missing from indexing"
+    for stage in ("retrieve", "augment", "synthesize"):
+        assert f'data-type="{stage}"' in run, f"{stage!r} missing from the Run page"
 
-    assert 'class="track track--index"' in page
-    assert 'class="track track--query"' in page
-    assert 'class="indexband"' in page
+    assert 'class="track track--index"' in indexing
+    assert 'class="track track--query"' in run
+    # The band goes with the track it describes, and only that one.
+    assert 'class="indexband"' in indexing
+    assert 'class="indexband"' not in run
 
 
 async def test_selecting_a_strategy_reveals_its_extra_stages(
@@ -1155,3 +1163,160 @@ async def _assert_declares_busy(
                     f"{path}: the form posting to {action} spends real money and "
                     f"declares no busy label, so it is silent on click:\n  {form}"
                 )
+
+
+# -- inline markdown in model prose ----------------------------------------
+
+
+def test_inline_markdown_escapes_before_it_decorates() -> None:
+    """The filter is not an opt-out of autoescaping, and this is the test that says so.
+
+    The answer is LLM output derived from uploaded documents — untrusted input, System
+    Design Section 6.5 priority 4. `| md` replaced `| e` on the answer body, so the
+    guarantee has to be re-established here: the text is escaped *first*, and the
+    emphasis rules then only ever wrap already-inert spans. No markup the model emits
+    can survive as markup.
+    """
+    from frontend.app import _inline_markdown
+
+    out = str(_inline_markdown('<script>alert(1)</script> **after**'))
+
+    assert "<script>" not in out
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in out
+    # And the emphasis still works on the same string.
+    assert "<strong>after</strong>" in out
+
+
+def test_inline_markdown_renders_the_three_things_models_actually_emit() -> None:
+    """Bold, italic and inline code. Models write these whether or not you ask."""
+    from frontend.app import _inline_markdown
+
+    assert "<strong>Net 45</strong>" in str(_inline_markdown("due **Net 45** on receipt"))
+    assert "<em>excusable delay</em>" in str(_inline_markdown("an *excusable delay*"))
+    assert "<code>retainage</code>" in str(_inline_markdown("the `retainage` clause"))
+
+
+def test_inline_markdown_leaves_underscored_words_and_stray_asterisks_alone() -> None:
+    """Two false positives that would be worse than having no emphasis at all.
+
+    `_italic_` is unsupported on purpose: contract text and filenames carry underscores
+    mid-word, and turning `acme_msa_2026` into emphasis mangles a citation. An unclosed
+    `**` is left as typed rather than guessed at.
+    """
+    from frontend.app import _inline_markdown
+
+    assert str(_inline_markdown("acme_msa_2026")) == "acme_msa_2026"
+    assert "**" in str(_inline_markdown("an unclosed ** marker"))
+
+
+def test_a_code_span_keeps_its_asterisks() -> None:
+    """Emphasis rules must not run inside a code span — that is what a code span is."""
+    from frontend.app import _inline_markdown
+
+    out = str(_inline_markdown("literally `a **b** c` here"))
+
+    assert "<code>a **b** c</code>" in out
+    assert "<strong>" not in out
+
+
+def test_no_block_syntax_and_no_links() -> None:
+    """Deliberately absent. A link is the one construct that carries a destination."""
+    from frontend.app import _inline_markdown
+
+    out = str(_inline_markdown("[label](https://example.com)\n# Heading\n- item"))
+
+    assert "<a" not in out
+    assert "<h1" not in out
+    assert "<ul" not in out
+    # The line structure survives anyway — `pre-wrap` in the stylesheet keeps it.
+    assert "- item" in out
+
+
+def test_a_prediction_button_puts_its_question_in_the_composer() -> None:
+    """Clicking a labelled example must show what it asked, not just ask it.
+
+    The question lives in the button's `value`, so the scripted path asked it and left
+    the textarea empty — a student saw an answer appear with no record of the question
+    that produced it. The no-JS path never had the bug, because the server re-renders
+    the asked question into the box; this is the scripted path catching up.
+    """
+    script = (STATIC / "axis.js").read_text()
+
+    assert 'event.submitter.name === "preset"' in script, (
+        "the submit handler does not special-case a prediction button"
+    )
+    assert "box.value = event.submitter.value" in script, (
+        "a prediction's question is never copied into the composer"
+    )
+
+
+def test_asking_clears_the_previous_answer() -> None:
+    """The last question's answer must not sit at the top while the next one runs.
+
+    It is the part a reader looks at first, and it looked settled — so a stale answer
+    above a freshly-running set of stages is the one arrangement guaranteed to be
+    misread. Replaced by a placeholder rather than removed, so the column does not
+    jump and the reader can see which question is being answered.
+    """
+    script = (STATIC / "axis.js").read_text()
+
+    assert 'canvas.querySelector(".answer")' in script, (
+        "asking does not clear the previous answer"
+    )
+    assert "answer--waiting" in script, (
+        "the previous answer is removed without leaving a placeholder"
+    )
+
+
+def test_every_page_that_shows_model_prose_renders_it_the_same_way() -> None:
+    """`| md` on the answer body and on the summary, not one of the two.
+
+    The filter arrived with the answer and the Summarize page kept `| e`, so the
+    longest piece of model prose the product shows was the one place a student saw
+    literal "**" around every heading the model wrote. Both are the same kind of text
+    and both are escaped before they are decorated — there is no reason for them to
+    differ, and the drift is invisible until you open the other page.
+    """
+    assert "{{ answer.answer | md }}" in (TEMPLATES / "_answer.html").read_text()
+    assert "{{ summary.summary | md }}" in (TEMPLATES / "summary.html").read_text()
+    assert "{{ summary.summary | e }}" not in (TEMPLATES / "summary.html").read_text()
+
+
+def test_a_poll_in_flight_cannot_overwrite_the_finished_answer() -> None:
+    """`stopPolling()` clears a flag; a fetch already in the air does not stop.
+
+    That poll was sent with `since` set, so the server renders it with
+    `answer_pending` — the "Answering…" placeholder — and it landed *after* `/ask` had
+    put the finished answer on screen, wiping the one thing the student asked for until
+    the next reload. The refresh has to re-check before it writes, not only before it
+    fetches.
+    """
+    script = (STATIC / "axis.js").read_text()
+
+    refresh = script.split("async function refreshCanvas()")[1].split(
+        "\n/* ---"
+    )[0]
+    fetched = refresh.index("await fetch(")
+    written = refresh.index("canvas.innerHTML =")
+    guards = [i for i in range(len(refresh)) if refresh.startswith("if (!polling) return;", i)]
+
+    assert any(fetched < g < written for g in guards), (
+        "refreshCanvas must re-check `polling` after its fetch resolves and before it "
+        "writes to the canvas"
+    )
+
+
+def test_an_upload_lands_on_the_page_that_draws_the_indexing_stages() -> None:
+    """Since Indexing became its own page, `/` shows nothing about an upload.
+
+    Intercepting the upload exists so a class can watch a document become vectors. The
+    navigation at the end still went to `/`, which after the split draws only the
+    answering track — so the run finished and returned the student to a page with no
+    trace of it.
+    """
+    script = (STATIC / "axis.js").read_text()
+    upload = script.split("async function onUpload(")[1]
+
+    assert 'window.location.assign("/indexing")' in upload
+    assert 'window.location.assign("/")' not in upload
+

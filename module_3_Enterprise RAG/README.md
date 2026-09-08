@@ -184,9 +184,14 @@ production system is the interesting part:
 
 - **No reranker.** Top-k by cosine similarity against one threshold, nothing
   more. No cross-encoder, no query rewriting, no hybrid keyword-plus-vector
-  scoring — all three are standard in production and all three are absent.
+  scoring — all three are standard in production and all three are absent. Two of
+  the three arrive next week: Module 4's [Axis](../module_4_Agentic%20RAG%20&%20Evaluation/)
+  adds a query rewriter and a hybrid BM25 arm, and measures what each one buys.
 - **No evaluation harness.** Faithfulness, coverage, and hallucination rates
-  are exactly what Week 6 is about.
+  are exactly what Week 6 is about. Module 4's [Axis](../module_4_Agentic%20RAG%20&%20Evaluation/)
+  is the first thing in this repo that actually scores retrieval — a golden set
+  over these same ACME documents, with precision@k, recall and four gated
+  ceilings.
 - **The vector store is a numpy matrix**, loaded from a JSON file and searched
   by one dot product against all 780 chunks. No Pinecone, no Chroma, no FAISS —
   on purpose, so nothing is hidden behind a service. It is also why the corpus

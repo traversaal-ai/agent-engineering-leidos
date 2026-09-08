@@ -1,6 +1,6 @@
 # Module 4: Exercises
 
-No coding required for any of these. They use the module's own diagrams, pain-point examples, and comparison tables, no built app is required to do them.
+Exercises 1-5 need no coding and no running app — they use the module's own diagrams, pain-point examples, and comparison tables. Exercises 6 and 7 run against [`axis/`](../axis/), the module's demo; setup is in the module [`README.md`](../README.md).
 
 ## Exercise 1: Match the pain point to the agentic-RAG ingredient
 
@@ -64,3 +64,31 @@ No coding required for any of these. They use the module's own diagrams, pain-po
 3. Pick whichever case you found hardest and write down what you would have inspected *first* to classify it, in one sentence.
 
 **Done when:** All four cases have a half and a named metric, you have explained the high-Faithfulness-but-useless case in (c), and you have stated your first inspection step.
+
+---
+
+## Exercise 6: Find the question where orchestration is a waste of money
+
+**Goal:** Break the intuition that the more sophisticated system is the better one. Requires a running Axis with the demo corpus loaded.
+
+**Steps:**
+1. Ask **"When is payment due on a correct invoice?"** under Naive RAG, then the identical question under Agentic RAG. Record, for each run: the answer, the number of LLM calls, the total cost, and the latency.
+2. Write down what the agentic run spent the extra calls on. Name each stage from its trace, and say what decision that stage made.
+3. Now ask **"What is the contractor entitled to if furnished equipment arrives more than thirty days late, and how is it granted?"** under both strategies. Record the same four things, and read the *retrieved context* for each run before you read either answer — the diagnostic order from Concept 9.
+4. The second question's agentic run costs roughly what the first one's did. Explain, in two sentences, why the same spend is waste on question 1 and the whole point on question 2. Name the specific stage that makes the difference.
+5. Open the router's `reason` on both agentic runs. It is model-authored, so it is a claim you can disagree with. Do you? Write one sentence saying whether the classification was right and how you can tell.
+
+**Done when:** You have four measurements per run across four runs, a stage-by-stage account of what the extra money bought in each case, and a written answer to why identical spend is wasteful in one and necessary in the other.
+
+## Exercise 7: Break the semantic cache, then explain why it broke
+
+**Goal:** Feel the difference between matching words and matching meaning, and find the failure mode that a cache keyed on raw text will always have. Requires a running Axis.
+
+**Steps:**
+1. With the cache on, ask a question, then ask it again with different punctuation and capitalisation. Confirm the second one hits the cache, and note what it cost.
+2. Now ask the *same question genuinely paraphrased* — every content word swapped, meaning identical. Record the similarity score and whether it hit. If you are running offline against the fake embedder, predict the result before you run it, then explain the result from what you know about how a bag-of-words embedding is computed.
+3. Ask **"When did the master services agreement take effect?"**, then the follow-up **"How long is it?"**. Look at the trace and identify which stage ran *before* the cache was consulted, and why the ordering has to be that way. What would the cache have returned if it had been keyed on the four words as typed?
+4. Design a question that *should* be refused by the cache even on an exact repeat. Say what property of the question makes a cached answer wrong, and name the mechanism that is supposed to catch it.
+5. From steps 2 and 4, write down the two distinct ways a semantic cache can be wrong: one where it misses something it should have hit, and one where it hits something it should have missed. Which is more dangerous in a production system, and why?
+
+**Done when:** You have a hit, a miss, a similarity score you can explain, an account of why the rewriter runs before the cache lookup on a follow-up, and a written comparison of the two failure directions.

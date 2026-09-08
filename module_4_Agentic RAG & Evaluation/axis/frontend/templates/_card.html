@@ -27,6 +27,13 @@
 {% set keep = ('&document=' ~ selected_document) if selected_document else '' %}
 {% set keep_only = ('?document=' ~ selected_document) if selected_document else '' %}
 
+{# Where this card's open and close links point. Indexing lives on `/indexing` now, so
+   an index card that linked to `/?stage=…` would open a page whose indexing track is
+   not drawn — the board would come back with nothing expanded and no indication why.
+   Defaulted to `/` so the answering cards, and any caller that has not been told, keep
+   the behaviour they had. #}
+{% set base = card_base if card_base is defined and card_base else '/' %}
+
 <li class="cardslot"
     data-stage="{{ stage.type }}"
     {% if stage.agentic_only %}data-agentic="true"{% endif %}>
@@ -67,7 +74,7 @@
       {% endif %}
       {% if expanded %}
       {# Back to the whole canvas. A real link, so it works with scripts disabled. #}
-      <a class="card__close" href="/{{ keep_only }}" title="Back to the whole canvas">&times;</a>
+      <a class="card__close" href="{{ base }}{{ keep_only }}" title="Back to the whole canvas">&times;</a>
       {% endif %}
     </header>
 
@@ -87,7 +94,7 @@
       <span class="siblings__label">searched for</span>
       {% for sib in siblings %}
       <a class="siblings__item {{ 'siblings__item--on' if sib.id == step.id }}"
-         href="/?stage={{ sib.id }}{{ keep }}"
+         href="{{ base }}?stage={{ sib.id }}{{ keep }}"
          data-step="{{ sib.id }}">{{ sibling_label(sib) | e }}</a>
       {% endfor %}
     </nav>
@@ -115,7 +122,7 @@
        inside a link makes it one enormous focus target that reads terribly aloud.
        Present only while collapsed — an expanded card holds the chunk pager and the
        narration control, and an invisible overlay across them would swallow both. #}
-    <a class="card__open" href="/?stage={{ step.id }}{{ keep }}" data-step="{{ step.id }}">
+    <a class="card__open" href="{{ base }}?stage={{ step.id }}{{ keep }}" data-step="{{ step.id }}">
       <span class="visually-hidden">Open the {{ stage.title }} stage</span>
     </a>
 

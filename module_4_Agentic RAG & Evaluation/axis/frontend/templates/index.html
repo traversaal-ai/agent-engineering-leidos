@@ -14,8 +14,11 @@
 
 {% block content %}
 
-{# Swapped wholesale by axis.js as a run advances, and re-rendered by the server on every
-   full page load. One renderer — see `_canvas.html`. #}
+{# The answer and the pipeline both come from `_canvas.html`, which is the single
+   renderer — `axis.js` fetches it from `/canvas` and swaps it in here. Putting the
+   answer in *this* file instead was the obvious first move and was wrong: the script
+   swaps `#canvas` only, so a JS-driven run would have rendered its answer nowhere.
+   One renderer is the convention CLAUDE.md sets, and this is why. #}
 <div id="canvas" class="canvaswrap">
   {% include "_canvas.html" %}
 </div>

@@ -29,9 +29,71 @@
    documents made the band report the index shrinking to what it held back then. #}
 {% set indexed = index_total or 0 %}
 
-<div class="canvasboard" {% if expanded_id %}data-expanded="true"{% endif %}>
+  {# Which tracks this page draws. Indexing has its own page, so the Run page passes
+   ('query',) and gets one track with the whole board to itself. Defaulted rather
+   than required so any caller that has not been told about phases still renders the
+   original two-track diagram. #}
+{% set shown = phases if phases is defined and phases else ('index', 'query') %}
 
-  {% for phase in ('index', 'query') %}
+{# **The answer leads, and the stages are its reasoning.** The answer used to be
+   readable only inside an expanded Generate card — the thing the student asked for,
+   rendered at diagram size, in a track that scrolled it out of view. Alex shows its
+   reply as a reply; so does this.
+
+   Both live in this file rather than in `index.html` because this is the fragment
+   `axis.js` swaps in. An answer rendered in the page shell would exist on a full
+   reload and vanish on every scripted run.
+
+   The disclosure stays **open by default**: on this product the pipeline is the
+   lesson, and a class watching from the back of a room cannot click. Open and
+   *secondary* is a weaker claim than equal, which is the right one — and
+   `test_every_stage_draws_its_data_without_being_clicked` holds regardless, since
+   `<details open>` renders its content into the HTML either way. #}
+{% if answer_pending %}
+{# The server renders the waiting state too, not only `axis.js`. The poller replaces
+   this whole fragment several times a second, so a placeholder that existed only in
+   the client was overwritten by the next poll — the previous answer came straight
+   back and sat above a run that was still going. One renderer, including for the
+   state that means "not yet". #}
+<p class="answer answer--waiting">
+  {%- if asked -%}
+  Answering &ldquo;{{ asked[:90] | e }}&rdquo;&hellip;
+  {%- else -%}
+  Answering&hellip;
+  {%- endif -%}
+</p>
+{% elif answer %}
+{% include "_answer.html" %}
+{% endif %}
+
+<details class="thinking" open>
+  <summary class="thinking__summary">
+    <span class="thinking__label">
+      {{- 'How it got there' if answer else 'The pipeline' -}}
+    </span>
+    <span class="thinking__hint">
+      {%- if answer -%}
+      {{ answer.latency_ms }} ms &middot; ${{ '%.5f' | format(answer.cost_usd) }}
+      {%- else -%}
+      nothing has run yet
+      {%- endif -%}
+    </span>
+  </summary>
+
+<div class="canvasboard"
+     {# One track, so the board must not keep three grid rows: the two it reserved for
+        the absent track and the band left a screen of empty dotted ground under the
+        stages. #}
+     {% if shown | length == 1 %}data-single="true"{% endif %}
+     {% if expanded_id %}data-expanded="true"{% endif %}>
+
+  {# **No band when indexing is not drawn.** It reads "the index · 39 vectors, written
+     by Store, read by Search", which is a fact about the indexing phase — on a page
+     that draws only the answering track it was a wide horizontal rule restating
+     something the Search card already says, and it pushed the stages down the board
+     to say it. It belongs with the track it describes. #}
+
+  {% for phase in shown %}
   {% set phase_stages = stages | selectattr('phase', 'equalto', phase) | list %}
   {# The track a card was expanded in grows; the other compresses to a spine, so the
      flow is never lost while you read one stage of it. #}
@@ -110,18 +172,7 @@
      pointing at where a card used to be reads as broken rather than as moved. The band
      lights up while a search runs instead, and the Search card says it reads here. #}
   {% if phase == 'index' %}
-  <div class="indexband" data-filled="{{ 'true' if indexed else 'false' }}">
-    <span class="indexband__label">
-      the index
-      {%- if indexed %} &middot; {{ indexed }} vector{{ '' if indexed == 1 else 's' }}{% endif %}
-    </span>
-    <span class="indexband__dots" aria-hidden="true">
-      {%- for i in range([indexed, 60] | min) -%}<span></span>{%- endfor -%}
-    </span>
-    <span class="indexband__note">
-      {{- 'written by Store, read by Search' if indexed else 'nothing stored yet' -}}
-    </span>
-  </div>
+  {% include "_indexband.html" %}
   {% endif %}
   {% endfor %}
 
@@ -137,3 +188,4 @@
   {% endif %}
 
 </div>
+</details>

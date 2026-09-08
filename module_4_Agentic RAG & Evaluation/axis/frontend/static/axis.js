@@ -235,6 +235,9 @@ async function showCanvas(stageId) {
  * and make the whole thing flicker. Seven swaps in a run is what this costs, and each one
  * coincides with something actually moving. */
 async function refreshCanvas() {
+  // Nothing to draw for a run that is already over. See the guard after the fetch —
+  // this one only saves the request.
+  if (!polling) return;
   const open = canvas.querySelector('.card[data-expanded]')?.dataset.step;
   const strategy = selectedStrategy();
   const params = new URLSearchParams();
@@ -249,7 +252,16 @@ async function refreshCanvas() {
   try {
     const response = await fetch(`/canvas?${params}`);
     if (!response.ok) return;
-    canvas.innerHTML = await response.text();
+    const html = await response.text();
+    // **The run may have finished while this was in the air, and then this fragment
+    // is stale in the one way that shows.** `stopPolling()` only clears a flag; a poll
+    // already awaiting its response carries on and used to write it. It was requested
+    // with `since` set, so the server renders it with `answer_pending` — the
+    // "Answering…" placeholder — and it landed *after* `/ask` had put the finished
+    // answer on screen, wiping it until the next reload. The answer that got wiped is
+    // the one the student asked for, and it looked like the run had produced nothing.
+    if (!polling) return;
+    canvas.innerHTML = html;
     wireNarration(canvas);
   } catch (error) {
     console.warn("Axis: could not refresh the canvas", error);
@@ -379,6 +391,16 @@ async function onAsk(event) {
   const strategy = selectedStrategy();
   if (!strategy) return; // let the native post handle it
 
+  // A prediction button carries its question in `value`, not in the box — so clicking
+  // one asked the question and left the composer empty, and a student could not see
+  // what they had just asked. Copied in before the body is built, which also makes
+  // `question` and `preset` agree on the wire. The no-JS path never had this problem:
+  // the server re-renders the asked question into the textarea.
+  if (event.submitter && event.submitter.name === "preset") {
+    const box = form.querySelector("textarea[name=question]");
+    if (box) box.value = event.submitter.value;
+  }
+
   // The pressed submit button's own name/value. A labelled example question is a
   // `<button name="preset">` inside this form, and `new FormData(form)` omits it — a
   // submitter's value is only included when passed explicitly. Without this, clicking
@@ -403,8 +425,10 @@ async function onAsk(event) {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    // The whole canvas, with the answer open. The server chose that, not this file —
-    // see `_run_query`.
+    // The whole canvas: the answer, then the stages that produced it. Both come from
+    // the server in one fragment — see `_canvas.html` — which is why this file never
+    // has to know how an answer is laid out, and why the placeholder above is simply
+    // overwritten rather than filled in.
     canvas.innerHTML = await response.text();
     wireNarration(canvas);
 
@@ -429,13 +453,31 @@ async function onAsk(event) {
   runFloor = null;
 }
 
-/* A new question invalidates the previous one's answering cards, but not the indexing
- * ones — those describe documents that are still indexed, and blanking them would
- * suggest asking a question un-indexes your files. */
+/* A new question invalidates the previous one's answering cards *and its answer*, but
+ * not the indexing ones — those describe documents that are still indexed, and blanking
+ * them would suggest asking a question un-indexes your files. */
 function resetQueryStages() {
   for (const card of canvas.querySelectorAll(".track--query .card")) {
     card.dataset.state = "pending";
     card.removeAttribute("data-expanded");
+  }
+
+  // **And the answer, which belongs to the question that has just been replaced.**
+  // It sits above the stages, so leaving it there during a run put the previous
+  // question's answer at the top of the screen while the new one's stages ran
+  // underneath it — the one arrangement guaranteed to be misread, because the answer
+  // is the part a reader looks at first and it looked settled.
+  //
+  // Replaced rather than removed, so the column does not jump: the placeholder holds
+  // roughly the space the answer had, and says which question it is waiting on.
+  const previous = canvas.querySelector(".answer");
+  if (previous) {
+    const box = form.querySelector("textarea[name=question]");
+    const asked = (box && box.value.trim()) || "";
+    const waiting = document.createElement("p");
+    waiting.className = "answer answer--waiting";
+    waiting.textContent = asked ? `Answering “${asked}”…` : "Answering…";
+    previous.replaceWith(waiting);
   }
 }
 
@@ -512,9 +554,13 @@ async function onUpload(event, uploadForm, submit) {
     // slow motion is on — the reload would land in the middle of the run a class was
     // watching.
     await settle();
-    // The sidebar lists the documents and is server-rendered, so it needs the round
-    // trip this flow avoided. Deferred until the indexing track has been watched.
-    window.location.assign("/");
+    // **To `/indexing`, which is the only page that draws the four stages.** This
+    // used to land on `/`, from the days when the indexing track was above the
+    // answering one there. Since the split it is not, so an upload ran, finished, and
+    // returned the student to a page showing nothing about it — the one moment the
+    // interception exists to make visible. The document just uploaded is the newest,
+    // which is what that page binds its four stages to by default.
+    window.location.assign("/indexing");
   } catch (error) {
     console.error("Axis: in-place upload failed, falling back to a full post", error);
     stopPolling();

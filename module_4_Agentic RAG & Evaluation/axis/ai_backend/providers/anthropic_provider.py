@@ -46,6 +46,35 @@ from ai_backend.providers.base import (
 DEFAULT_BASE_URL = "https://api.anthropic.com/v1"
 API_VERSION = "2023-06-01"
 
+# Models that reject `temperature` outright rather than ignoring it. Anthropic removed
+# the sampling parameters (`temperature`, `top_p`, `top_k`) from these models, and
+# answers a request carrying one with HTTP 400 — so forwarding it is not a harmless
+# no-op, it fails the call.
+#
+# **Not only the 5 family.** The list first held the three Claude 5 ids, which is where
+# the 400 was met; the removal actually landed with Opus 4.7 and covers 4.8 as well, so
+# `AXIS_LLM__MODEL=claude-opus-4-8` failed every call exactly as `claude-sonnet-5` had.
+# Prefixes rather than exact ids: `claude-fable-5` also matches `claude-fable-5-1`, and
+# `claude-opus-5` any later dated variant of it.
+#
+# The cut is at Opus 4.6 / Sonnet 4.6, which still honour the parameter — checked
+# rather than dropped unconditionally because Axis asks for 0.0 deliberately: a teaching
+# demo that answers differently on a re-run of the same question makes the two
+# strategies look like they differ when only the sampling did. Where the parameter
+# survives, we keep it.
+_TEMPERATURE_DEPRECATED_PREFIXES = (
+    "claude-opus-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-sonnet-5",
+    "claude-fable-5",
+    "claude-mythos-5",
+)
+
+
+def _accepts_temperature(model: str) -> bool:
+    return not model.startswith(_TEMPERATURE_DEPRECATED_PREFIXES)
+
 # Anthropic's vocabulary for why generation stopped, mapped onto ours.
 _STOP_REASONS = {
     "end_turn": FinishReason.STOP,
@@ -110,7 +139,7 @@ class AnthropicLLMProvider(HttpProvider):
             payload["system"] = system
         if tools:
             payload["tools"] = [_to_anthropic_tool(t) for t in tools]
-        if temperature is not None:
+        if temperature is not None and _accepts_temperature(target):
             payload["temperature"] = temperature
 
         body = await self._post("/messages", payload)
@@ -172,7 +201,10 @@ class AnthropicLLMProvider(HttpProvider):
         }
         if system:
             payload["system"] = system
-        if temperature is not None:
+        # The same check `complete` makes, and for the same reason. Latent today —
+        # nothing in Axis passes a temperature to `stream` — but a streamed call is
+        # the same endpoint, so a caller that did would meet the same 400.
+        if temperature is not None and _accepts_temperature(target):
             payload["temperature"] = temperature
 
         url = f"{self._base_url}/messages"

@@ -176,9 +176,32 @@ Use an **LLM to call an API and infer the parameters of that API**. An LLM gener
 
 The memory is just a **flat list of the conversations** the agent had with the user. On a new message, the agent reasoning loop fetches conversation history, sends tool input and receives tool output as needed, and stores the updated conversation history.
 
+### Semantic Caching
+
+Not one of the four ingredients — it comes from the Enterprise RAG pipeline in Concept 5, where it sits early, right after the input guardrail. It earns its place here because it is the cheapest thing on the diagram to demonstrate and the easiest to get wrong.
+
+**What it does.** Before a question enters the pipeline at all, embed it and compare it against the questions already answered this session. Above a similarity threshold, return the stored answer and spend nothing else. A student asks a question, asks it again in different words, and watches four LLM calls become one embedding. The efficiency lesson is a stopwatch rather than an argument.
+
+**Three things that are easy to get wrong, and all three are visible in Axis:**
+
+- **What you store.** Storing only the answer string throws away its citations, and an answer whose provenance was discarded cannot satisfy a citation requirement. "It was cached" is not an exemption. Store the whole answer, sources included.
+- **What you key on.** A follow-up cached under its own words is a trap. "How long is it?" keyed on those four words will match a previous "How long is it?" about something else entirely and serve the wrong answer with a straight face. So a question with conversation history behind it has to be **rewritten first** and cached under the resolved form. This is where the cache and conversation memory turn out to be coupled: you cannot safely cache a conversation without resolving it.
+- **What you refuse to cache.** Some questions have answers that expire. A staleness gate — even a crude keyword match on time-sensitive phrasing — is what keeps a cache from confidently serving last week.
+
+**And the honest limit, which is worth doing in class rather than discovering live.** A semantic cache needs real embeddings to do the thing its name promises. Against a bag-of-words embedder, a repeat, a punctuation change and a stopword swap all hit, while a genuine paraphrase — "How soon must a correct invoice be paid?" against "When is payment due on a correct invoice?" — misses, because a bag of words has no way to know those mean the same thing. Which is the entire point of a *semantic* cache, and a good five minutes on what an embedding model is actually buying you.
+
 ### Demo: Naive RAG vs. Agentic RAG
 
-The module walks through a live, side-by-side demo comparing a Naive RAG pipeline against an Agentic RAG pipeline.
+The module walks through a live, side-by-side demo comparing a Naive RAG pipeline against an Agentic RAG pipeline. **That demo is in this folder: [`axis/`](../axis/).**
+
+Axis runs both strategies over the same documents, the same index, the same embedding model and the same synthesis prompt, so the only difference between two runs is the orchestration in front of retrieval. The setup and the questions to ask are in the module [`README.md`](../README.md); what to watch for while it runs:
+
+- **The shape of the trace, before any of the numbers.** Naive RAG emits two steps: retrieve, then synthesize. Agentic RAG reaches the same two through four decisions in front of them — rewrite, cache lookup, route, decompose — and can then escalate into a bounded loop where retrieval came back empty. The difference between the two strategies is visible as structure, which is the whole reason to look at a trace rather than an answer.
+- **The router's `reason`, which is model-authored.** It is the thing in the run you can actually disagree with, and disagreeing with it out loud is the exercise.
+- **Three LLM calls against one.** Route, decompose and synthesize, plus one more per escalated sub-question. Agency is not free, and the cost line says exactly what it cost.
+- **A question where naive RAG wins.** "When is payment due on a correct invoice?" is one fact in one place. Both strategies find it and answer identically; the agentic run just paid three times as much to get there. Run this one *before* the questions where orchestration pays off — a student who only ever sees the agentic win learns the wrong lesson.
+
+The four naive RAG pain points from Module 3 each get their own demonstration on Axis's *Why agentic* page, and each is answered by a **different** mechanism: summarization by map-reduce over every chunk, comparison by the decomposer, implicit data by the router's depth decision plus a hop chain, and memory by conversation history resolved by a query rewriter. Four failures, four different fixes — which is the part that matters more than "agentic is better."
 
 ---
 
@@ -257,6 +280,16 @@ result:    x     R     R     x     R
 
 Recall@5 and Precision@5 tie at 0.60 here only because k happens to equal the number of relevant documents; they answer different questions and diverge the moment that stops being true. And the practical consequence: **a reranker changes order, not membership**, so it can only move NDCG@k and MRR. If two relevant documents never made the top 5 at all, no reranker will save you, that is a recall problem living upstream in chunking, embedding, or retrieval depth.
 
+**These four are computed on the demo.** `axis/` scores a twenty-question golden set and reports precision@k, document recall and a retrieval pass rate, dense against hybrid:
+
+```
+cd axis && python -m ai_backend.evaluation --fake --compare-modes
+```
+
+Two things in that report are worth the time. First, **eight of the twenty questions are designed to fail retrieval** — the compound, multi-hop and conversational ones fail by construction, because failing whole and succeeding split is exactly what the harness measures. A mean recall of 0.581 is not a weak retriever; it is a set built to expose a specific gap. Reading an aggregate without reading what is in the set is its own failure mode.
+
+Second, it puts the reranking lesson above on a number. Axis has **no reranker at all** — its hybrid arm is BM25 fused with dense retrieval, which changes *membership*, not order. That is why it moves document recall by +0.094, which no reranker could have done. The clearest case is a single question about *retainage*: the word appears in one clause of one document and nowhere else in the corpus, so the dense arm finds nothing and the keyword arm finds it immediately. No amount of reordering gets you there — which is the same lesson as "a document that never made the top k is an upstream problem," seen from the other side.
+
 See `../reference/rag-evaluation.md` for the full deep dive.
 
 ---
@@ -287,6 +320,10 @@ A RAG system can fail at either half independently: perfect retrieval with a mod
 The trap this avoids is tuning prompts to fix what is actually a retrieval bug.
 
 **And this is where the module's two halves meet.** Agentic RAG doesn't escape the pyramid, it just moves where failures originate. A **Router** picking the wrong knowledge base is a Level 3 failure, and the generator may then be perfectly faithful to context that came from the wrong place, so Faithfulness stays high while the answer is useless. **One-Shot Query Planning** raises Context Recall on comparison and multi-hop queries, but adds a synthesis step where the final answer can drift from what any individual sub-query retrieved, a Level 4 risk naive RAG doesn't have. Every decision point agency adds is a new place for a failure to originate.
+
+**On the demo, Level 4 is enforced as a rule before it is scored as a metric.** Axis withholds an uncited answer: if no citation survives validation the pipeline returns "I could not find that" rather than an unattributable claim, and the model's raw output stays visible in the trace so nothing is hidden — it simply declines to vouch for it. All four deliberately unanswerable golden questions are declined in both retrieval modes.
+
+Worth noting what that does *not* cover, because it is the boundary of what a harness can check offline. The hardest ungrounded case is a question sitting right next to real content — "what is the response time for a Severity 4 issue?" against a document defining Severity 1, 2 and 3. Retrieval is *right* to return that passage; declining is the model's job, and a stub model cannot do it. So the most interesting Level 4 failure is measurable only on a real-provider run. That gap is named in the golden set rather than left for someone to discover.
 
 See `../reference/rag-evaluation.md` for the full deep dive on both levels.
 
@@ -323,4 +360,6 @@ See `../reference/rag-evaluation.md` for the full deep dive on both levels.
 
 ## Where to next
 
-Do `exercises.md` for hands-on practice with agentic RAG design and evaluation diagnosis, including computing the retrieval metrics by hand. Or ask to be quizzed (`quiz.md`). For the fuller treatment of both evaluation levels, including the worked metric example and how the agent ingredients shift where failures originate, see `../reference/rag-evaluation.md`.
+**Run the demo.** [`axis/`](../axis/) is where everything above stops being a claim: two strategies over one index, the four pain points each answered by a different mechanism, and a golden set that scores Levels 3 and 4. Setup and the questions to ask are in the module [`README.md`](../README.md). Start with the question naive RAG wins.
+
+Then do `exercises.md` for hands-on practice with agentic RAG design and evaluation diagnosis — five on paper, including computing the retrieval metrics by hand, and two against a running Axis. Or ask to be quizzed (`quiz.md`). For the fuller treatment of both evaluation levels, including the worked metric example and how the agent ingredients shift where failures originate, see `../reference/rag-evaluation.md`.

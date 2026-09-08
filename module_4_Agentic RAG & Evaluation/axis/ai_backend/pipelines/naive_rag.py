@@ -36,7 +36,7 @@ from ai_backend.pipelines.grounding import (
     NO_CONTENT_SENTINEL,
     UNGROUNDED_ANSWER,
     augment,
-    extract_citations,
+    resolve_citations,
     passages_from,
 )
 
@@ -108,7 +108,12 @@ class NaiveRagPipeline:
                     usage=context.usage + completion.usage,
                 )
 
-            citations = extract_citations(completion.text, passages)
+            # Text and citations from one walk, so the markers in the prose and
+            # the numbers on the list cannot disagree. They did: the list is built
+            # in order of first appearance and rendered from its own loop index, so
+            # a model writing "[1] ... [4]" produced prose citing [4] beside a list
+            # whose second entry was labelled [2].
+            answer_text, citations = resolve_citations(completion.text, passages)
             step.set_attribute("citations", len(citations))
             step.set_output(completion.text)
 
@@ -134,7 +139,7 @@ class NaiveRagPipeline:
                 )
 
             return Answer(
-                text=completion.text,
+                text=answer_text,
                 strategy=self.strategy,
                 trace_id=ctx.trace_id,
                 citations=citations,
