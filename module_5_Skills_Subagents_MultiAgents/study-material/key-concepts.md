@@ -1,0 +1,27 @@
+# Module 5: Key Concepts (Glossary)
+
+- **Build the system, then prove the output**: The module's core framing. Skills, subagents, agent teams, guardrails, and context are ingredients; evals, benchmarks, test suites, human review, and success metrics are the taste test that proves the ingredients were actually good.
+- **`.claude/` folder, three layers**: User (`~/.claude/`, personal, follows you everywhere), Project (`.claude/` + `CLAUDE.md`, committed to git, shared with the team), Project-personal (`settings.local.json`, `CLAUDE.local.md`, gitignored, just you).
+- **Skill**: A saved prompt with superpowers — turns written instructions into a single slash command. Runs in your own context window. Deterministic: same shape of output every time.
+- **The single fork in the road**: Do your workers need to talk to each other? No -> use subagents. Yes -> use agent teams.
+- **Subagent**: A specialist you delegate a task to. Works alone in its own fresh context window, hands back a clean summary. Strictly vertical communication (you <-> the subagent) — subagents never talk to each other. ~1-1.5x token cost. Stable since July 2025.
+- **Agent team**: Multiple specialists that message each other directly. Needed when one teammate's decision changes what another needs to do. 3-4x typical token cost, up to 7x in plan mode. Experimental since Feb 2026.
+- **The 9/10 rule**: Subagents cover ~90% of real-world parallelization needs. Agent teams cover the 10% where lateral coordination genuinely changes the outcome.
+- **Three tiers of automation**: Skills (slash commands, triggered on demand) -> Sub-agents (a specialist on call) -> Agent teams (multiple specialists coordinating, with an orchestrator).
+- **The six subagent fields**: `name` (identifier), `description` (the trigger — most important field), `model` (match task to tier), `tools` (least privilege), `memory` (learns across sessions), `skills` (bakes in domain knowledge).
+- **`description` is the trigger**: Claude reads it to decide when to delegate. Write it as a condition ("Use when asked to..."). Vague descriptions don't fire reliably.
+- **Least-privilege tooling**: Give each subagent only the tools its job needs — fewer tools means safer, faster, more predictable output.
+- **Model selection rule**: Haiku is the global default (copy, formatting, classification, short lookups). Sonnet for balanced tasks (code review, PRD analysis). Opus is override-only (deep research, complex reasoning).
+- **`CLAUDE_CODE_SUBAGENT_MODEL`**: Sets a global default model for all subagents, so they don't silently inherit your (often more expensive) main-session model.
+- **Subagent memory**: A folder the agent writes notes into across sessions — it reads its own notes first on later runs and becomes a specialist on your product over time.
+- **Three subagent patterns**: Parallel exploration (one subagent per independent item), sequential pipeline (spec -> review -> build, no lateral talk), reusable specialist library (a shared catalog the whole team can use).
+- **Ground truth**: The expected behavior you measure an agent against. Exact Match (structured, one right answer), Rubric-Based (wording can vary, score on criteria), Comparative (subjective, human preference).
+- **Skills are deterministic**: Same input shape produces the same output shape, which makes exact-match ground truth possible.
+- **Skill eval loop (4 steps)**: Write the golden output first -> run 5 input variations -> Claude-as-judge scores against ground truth -> fix in `SKILL.md`, rerun until 5/5 pass.
+- **Ship threshold, skills**: 5/5 input variations pass. Not 4. Not "mostly."
+- **Subagents are non-deterministic**: They make autonomous decisions (what to search, include, skip), so output varies run to run — you need a rubric, not an exact match.
+- **The 4 rubric dimensions**: Scope adherence (only what was asked), Source citation (every claim has a verifiable source), Uncertainty flagging (what it couldn't find is stated, not hidden), Format compliance (matches the structure the description promised).
+- **Embedded rubric**: The rubric written into the subagent's own system prompt, so it self-checks all four dimensions before responding, in addition to an external spot-check afterward.
+- **Subagent eval loop (5 steps)**: Write 10 ground truth examples -> run the eval against each -> score and find the failure pattern -> fix in the system prompt, not the output -> don't ship below 8/10.
+- **Confidence scorecard**: 10/10 -> ship it. 8-9/10 -> ship with caution. 5-7/10 -> fix first. Under 5/10 -> rethink the design.
+- **Common failure modes**: Wrong trigger, wrong process, wrong output format, efficiency issue — the same four modes recur across skills, subagents, and agent teams, getting costlier as coordination increases.
